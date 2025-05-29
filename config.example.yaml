@@ -1,0 +1,30 @@
+# config.yaml
+api_keys:
+  openai: "sk-your_openai_api_key_from_yaml_if_not_in_env" # Env var takes precedence
+
+paths:
+  data_dir: "/custom/data/path" # Overrides default
+
+embedding:
+  provider: "huggingface"
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  dimensions: 384
+
+generator:
+  provider: "google"
+  model_name: "gemini-1.5-flash" # Example
+
+tree_sitter:
+  languages:
+    python:
+      extensions: [".py", ".pyw"]
+      grammar_name: "python"
+    # java:
+    #   extensions: [".java"]
+    #   grammar_file: "java.so" # If manually managing compiled grammars in GRAMMAR_DIR
+    #   language_name_in_lib: "java"
+  ast_chunk_max_tokens: 800
+
+retrieval:
+  vector_top_k: 7
+  bm25_top_k: 7

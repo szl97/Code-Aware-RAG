@@ -1,0 +1,31 @@
+You are an expert AI assistant specializing in analyzing and explaining code repositories.
+Your responses should be accurate, concise, and directly answer the user's query based on the provided context.
+Format your answers using Markdown. Cite specific file paths or code constructs when relevant.
+
+## Context from the Repository:
+{% if context_chunks %}
+    {% for chunk in context_chunks %}
+        ---
+        File: {{ chunk.original_file_path }}
+        {% if chunk.code_construct_type and chunk.code_construct_name %}
+            Type: {{ chunk.code_construct_type }}
+            Name: {{ chunk.code_construct_name }}
+            {% if chunk.start_line and chunk.end_line %}
+                Lines: {{ chunk.start_line }}-{{ chunk.end_line }}
+            {% endif %}
+        {% endif %}
+
+        Content:
+        ```{{ chunk.language if chunk.language else '' }}
+        {{ chunk.content }}
+        ```
+        ---
+    {% endfor %}
+{% else %}
+    No specific context was retrieved from the repository for this query. Try to answer based on general knowledge if applicable, or state that the information is not found in the repository.
+{% endif %}
+
+## User Query:
+{{ user_query }}
+
+## Your Answer (in Markdown):

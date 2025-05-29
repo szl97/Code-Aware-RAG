@@ -25,7 +25,7 @@
 ├── main.py                 \# API服务启动入口  
 ├── requirements.txt        \# Python依赖  
 ├── .env.example            \# 环境变量示例文件 (用户需复制为 .env)  
-├── config.yaml.example     \# 应用配置示例文件 (用户可选复制为 config.yaml)  
+├── config.example.yaml     \# 应用配置示例文件 (用户可选复制为 config.yaml)  
 ├── grammars/               \# (可选) 存放手动编译的tree-sitter语法库 (.so, .dll)  
 │  
 └── src/                    \# 源代码目录  
