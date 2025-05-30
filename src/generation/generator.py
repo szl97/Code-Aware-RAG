@@ -36,33 +36,6 @@ def get_openai_llm_client():
             raise
     return _openai_llm_client
 
-def get_google_llm_model():
-    """Initializes and returns a Google GenerativeModel instance."""
-    global _google_llm_model
-    if _google_llm_model is None:
-        if not config.GOOGLE_API_KEY:
-            logger.error("Google API key not configured. Cannot use Google for generation.")
-            raise ValueError("Google API key not set.")
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=config.GOOGLE_API_KEY)
-            _google_llm_model = genai.GenerativeModel(
-                config.GENERATOR_MODEL_NAME,
-                generation_config={ # Ensure generation_config is correctly structured
-                    "temperature": config.GENERATOR_TEMPERATURE,
-                    "max_output_tokens": config.GENERATOR_MAX_TOKENS,
-                    # Add top_p, top_k if supported and configured
-                }
-            )
-            logger.info(f"Google GenerativeModel '{config.GENERATOR_MODEL_NAME}' initialized.")
-        except ImportError:
-            logger.error("Google Generative AI package not installed. `pip install google-generativeai`")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to initialize Google GenerativeModel: {e}")
-            raise
-    return _google_llm_model
-
 # --- Prompt Templating ---
 # Assume prompt templates are stored in a 'templates' directory within 'src'
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
@@ -72,10 +45,7 @@ TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_PROMPT_TEMPLATE_FILE = TEMPLATE_DIR / "rag_prompt_template.jinja2"
 if not DEFAULT_PROMPT_TEMPLATE_FILE.exists():
     DEFAULT_PROMPT_TEMPLATE_FILE.write_text(
-        """You are an expert AI assistant specializing in analyzing and explaining code repositories.
-        Your responses should be accurate, concise, and directly answer the user's query based on the provided context.
-        Format your answers using Markdown. Cite specific file paths or code constructs when relevant.
-        
+        """        
         ## Context from the Repository:
         {% if context_chunks %}
         {% for chunk in context_chunks %}
@@ -102,7 +72,7 @@ if not DEFAULT_PROMPT_TEMPLATE_FILE.exists():
         ## User Query:
         {{ user_query }}
         
-        ## Your Answer (in Markdown):
+        ## Your Answer:
         """
     )
     logger.info(f"Created default prompt template: {DEFAULT_PROMPT_TEMPLATE_FILE}")
@@ -122,20 +92,16 @@ class LLMGenerator:
     """
     def __init__(
             self,
-            provider: str = config.GENERATOR_MODEL_PROVIDER,
             model_name: str = config.GENERATOR_MODEL_NAME,
             temperature: float = config.GENERATOR_TEMPERATURE,
-            max_tokens: int = config.GENERATOR_MAX_TOKENS,
             prompt_template_name: str = "rag_prompt_template.jinja2"
     ):
-        self.provider = provider
         self.model_name = model_name
         self.temperature = temperature
-        self.max_tokens = max_tokens
-
+        self.sys_prompt = config.GENERATOR_PROMPT
         try:
             self.prompt_template = jinja_env.get_template(prompt_template_name)
-            logger.info(f"LLMGenerator initialized with provider: {provider}, model: {model_name}, template: {prompt_template_name}")
+            logger.info(f"LLMGenerator initialized with model: {model_name}, template: {prompt_template_name}")
         except Exception as e:
             logger.error(f"Failed to load prompt template '{prompt_template_name}': {e}")
             raise
@@ -165,6 +131,7 @@ class LLMGenerator:
 
     async def generate_response_stream(
             self,
+            sys_prompy: Optional[str],
             user_query: str,
             context_chunks: List[Dict[str, Any]] # Metadata dicts from retriever
     ) -> AsyncIterator[str]:
@@ -180,60 +147,33 @@ class LLMGenerator:
         """
         full_prompt = self._construct_prompt(user_query, context_chunks)
 
-        logger.info(f"Generating streaming response from {self.provider}/{self.model_name}...")
+        logger.info(f"Generating streaming response from {self.model_name}...")
 
-        if self.provider == "openai":
-            client = get_openai_llm_client()
-            try:
-                stream = await client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        # OpenAI prefers a system message for overall instructions,
-                        # and user message for the combined context+query.
-                        # Our template currently puts everything into one block.
-                        # For better OpenAI results, might refine template for system/user roles.
-                        {"role": "user", "content": full_prompt}
-                    ],
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    stream=True
-                )
-                async for chunk in stream:
+        client = get_openai_llm_client()
+        try:
+            stream = await client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompy or config.GENERATOR_PROMPT},
+                    {"role": "user", "content": full_prompt}
+                ],
+                temperature=self.temperature,
+                stream=True
+            )
+            async for chunk in stream:
+                if len(chunk.choices) > 0:
                     content = chunk.choices[0].delta.content
                     if content is not None:
                         yield content
-                logger.info("OpenAI streaming response finished.")
-            except Exception as e:
-                logger.error(f"Error during OpenAI streaming: {e}")
-                yield f"\nAn error occurred with the OpenAI API: {str(e)}"
-
-        elif self.provider == "google":
-            model = get_google_llm_model()
-            try:
-                # Google's API might have a slightly different way to specify stream=True
-                # and handle chat history if needed.
-                # For a single turn from a complex prompt, generate_content is fine.
-                # Ensure the model is configured for streaming if it's a separate setting.
-                # The `stream=True` parameter is on the `generate_content` call.
-                responses = await model.generate_content_async(full_prompt, stream=True) # Pass stream=True here
-                async for chunk in responses: # Iterate over the async generator
-                    if hasattr(chunk, 'text') and chunk.text:
-                        yield chunk.text
-                    # elif hasattr(chunk, 'parts'): # Check for parts if text is not directly available
-                    #     for part in chunk.parts:
-                    #         if hasattr(part, 'text') and part.text:
-                    #             yield part.text
-                logger.info("Google streaming response finished.")
-            except Exception as e:
-                logger.error(f"Error during Google streaming: {e}")
-                yield f"\nAn error occurred with the Google API: {str(e)}"
-        else:
-            logger.error(f"Unsupported LLM provider for streaming: {self.provider}")
-            yield f"\nError: LLM provider '{self.provider}' is not supported for streaming generation."
+            logger.info("OpenAI streaming response finished.")
+        except Exception as e:
+            logger.error(f"Error during OpenAI streaming: {e}")
+            yield f"\nAn error occurred with the OpenAI API: {str(e)}"
 
 
     async def generate_response_non_streaming(
             self,
+            sys_prompy: Optional[str],
             user_query: str,
             context_chunks: List[Dict[str, Any]]
     ) -> str:
@@ -241,42 +181,27 @@ class LLMGenerator:
         Generates a complete response from the LLM (non-streaming).
         """
         full_prompt = self._construct_prompt(user_query, context_chunks)
-        logger.info(f"Generating non-streaming response from {self.provider}/{self.model_name}...")
+        logger.info(f"Generating non-streaming response from {self.model_name}...")
 
         full_response_text = ""
 
-        if self.provider == "openai":
-            client = get_openai_llm_client()
-            try:
-                completion = await client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[{"role": "user", "content": full_prompt}],
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
-                    stream=False # Ensure stream is False
-                )
-                if completion.choices and completion.choices[0].message:
-                    full_response_text = completion.choices[0].message.content or ""
-                logger.info("OpenAI non-streaming response received.")
-            except Exception as e:
-                logger.error(f"Error during OpenAI non-streaming generation: {e}")
-                full_response_text = f"An error occurred with the OpenAI API: {str(e)}"
-
-        elif self.provider == "google":
-            model = get_google_llm_model()
-            try:
-                response = await model.generate_content_async(full_prompt, stream=False) # Ensure stream is False
-                full_response_text = response.text if hasattr(response, 'text') else ""
-                if not full_response_text and hasattr(response, 'parts'): # Fallback for complex responses
-                    full_response_text = "".join([part.text for part in response.parts if hasattr(part, 'text')])
-
-                logger.info("Google non-streaming response received.")
-            except Exception as e:
-                logger.error(f"Error during Google non-streaming generation: {e}")
-                full_response_text = f"An error occurred with the Google API: {str(e)}"
-        else:
-            logger.error(f"Unsupported LLM provider: {self.provider}")
-            full_response_text = f"Error: LLM provider '{self.provider}' is not supported."
+        client = get_openai_llm_client()
+        try:
+            completion = await client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompy or config.GENERATOR_PROMPT},
+                    {"role": "user", "content": full_prompt}
+                ],
+                temperature=self.temperature,
+                stream=False # Ensure stream is False
+            )
+            if completion.choices and completion.choices[0].message:
+                full_response_text = completion.choices[0].message.content or ""
+            logger.info("OpenAI non-streaming response received.")
+        except Exception as e:
+            logger.error(f"Error during OpenAI non-streaming generation: {e}")
+            full_response_text = f"An error occurred with the OpenAI API: {str(e)}"
 
         return full_response_text.strip()
 
@@ -313,17 +238,15 @@ if __name__ == "__main__":
     test_user_query = "How does the helper_function work and what is the project about?"
 
     async def run_tests():
-        # Test with configured provider (ensure your .env or config.yaml points to a working one)
-        logger.info(f"\n--- Testing LLMGenerator with configured provider: {config.GENERATOR_MODEL_PROVIDER} ---")
         generator = LLMGenerator()
 
         logger.info("\n--- Testing Non-Streaming Response ---")
-        response = await generator.generate_response_non_streaming(test_user_query, dummy_context)
+        response = await generator.generate_response_non_streaming(None, test_user_query, dummy_context)
         logger.info(f"Non-streaming response:\n{response}")
 
         logger.info("\n--- Testing Streaming Response ---")
         full_streamed_response = ""
-        async for chunk_text in generator.generate_response_stream(test_user_query, dummy_context):
+        async for chunk_text in generator.generate_response_stream(None, test_user_query, dummy_context):
             print(chunk_text, end="", flush=True) # Print stream directly
             full_streamed_response += chunk_text
         print("\n--- End of Stream ---")

@@ -6,13 +6,11 @@ paths:
   data_dir: "/custom/data/path" # Overrides default
 
 embedding:
-  provider: "huggingface"
-  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  model_name: "text-embedding-3-small"
   dimensions: 384
 
 generator:
-  provider: "google"
-  model_name: "gemini-1.5-flash" # Example
+  model_name: "gpt-4o" # Example
 
 tree_sitter:
   languages:
@@ -26,5 +24,5 @@ tree_sitter:
   ast_chunk_max_tokens: 800
 
 retrieval:
-  vector_top_k: 7
-  bm25_top_k: 7
+  vector_top_k: 20
+  bm25_top_k: 5

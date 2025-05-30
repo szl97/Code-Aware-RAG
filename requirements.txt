@@ -7,22 +7,17 @@ uvicorn[standard] >=0.22.0
 
 pydantic>=2.0.0
 
-# **LLM SDKs (choose based on your preference)**
-
+# **LLM SDKs**
 openai>=1.0.0
-google-generativeai>=0.3.0
 
 # **anthropic \# Uncomment if using Claude**
 
 # **Vector Database and Embeddings**
-
-faiss-cpu>=1.7.4 # Or faiss-gpu if you have CUDA
-sentence-transformers>=2.2.0 # For generating embeddings, or use OpenAI/Cohere directly
+faiss-cpu>=1.11.0 # Or faiss-gpu if you have CUDA
 
 # **RAG Core & Text Processing**
-
-adalflow>=0.1.0 # Assuming continued use for some components, or can be replaced
 tiktoken>=0.5.0 # For token counting
+Jinja2>=3.1.6
 
 # **Code Parsing**
 
@@ -35,7 +30,6 @@ tree-sitter-typescript
 
 
 # **Sparse Retrieval**
-
 rank_bm25>=0.2.2
 
 # **Configuration and Utilities**
@@ -61,9 +55,3 @@ GitPython>=3.1.0
 # **neo4j**
 
 # **networkx**
-
-# **Testing**
-
-# **pytest**
-
-# **pytest-asyncio**

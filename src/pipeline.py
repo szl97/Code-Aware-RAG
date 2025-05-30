@@ -244,39 +244,6 @@ if __name__ == "__main__":
         # Perform some queries
         queries_to_test = [
             "How to use it?",
-            """
-            2025-05-29 17:46:24 - core.ai - ERROR - 生成响应时出错: Error code: 400 - {'error': {'sensitive': None, 'code': '400', 'httpCode': 400, 'message': '没有可用渠道', 'type': 'Illegal Argument', 'param': None}}
-Traceback (most recent call last):
-  File "/Users/saizhuolin/test/bella-issues-bot/core/ai.py", line 148, in generate_response
-    for chunk in chain.stream({"input": prompt}):
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 3424, in stream
-    yield from self.transform(iter([input]), config, **kwargs)
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 3410, in transform
-    yield from self._transform_stream_with_config(
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 2205, in _transform_stream_with_config
-    chunk: Output = context.run(next, iterator)
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 3372, in _transform
-    yield from final_pipeline
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 4860, in transform
-    yield from self._transform_stream_with_config(
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 2168, in _transform_stream_with_config
-    final_input: Optional[Input] = next(input_for_tracing, None)
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/runnables/base.py", line 1437, in transform
-    yield from self.stream(final, config, **kwargs)
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_core/language_models/chat_models.py", line 494, in stream
-    for chunk in self._stream(input_messages, stop=stop, **kwargs):
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/langchain_openai/chat_models/base.py", line 907, in _stream
-    response = self.client.create(**payload)
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/openai/_utils/_utils.py", line 287, in wrapper
-    return func(*args, **kwargs)
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 925, in create
-    return self._post(
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/openai/_base_client.py", line 1239, in post
-    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
-  File "/opt/miniconda3/envs/bella-issues-bot/lib/python3.10/site-packages/openai/_base_client.py", line 1034, in request
-    raise self._make_status_error_from_response(err.response) from None
-openai.BadRequestError: Error code: 400 - {'error': {'sensitive': None, 'code': '400', 'httpCode': 400, 'message': '没有可用渠道', 'type': 'Illegal Argument', 'param': None}}
-            """,
             "If I want to change the model, what to do?"
         ]
 

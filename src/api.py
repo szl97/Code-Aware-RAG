@@ -52,11 +52,10 @@ class RepositorySetupResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     repo_id: str = Field(..., description="The unique identifier of the repository to query (must have been set up first).")
+    sys_prompt: Optional[str] = Field(config.GENERATOR_PROMPT, description="The system query for LLM generation.")
     query_text: str = Field(..., description="The user's query about the code repository.")
     top_n_final: Optional[int] = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Number of final context chunks to consider for generation.")
-    # Add other generation parameters if needed (e.g., temperature override)
 
-# (StreamingResponse will handle the response type for streaming queries)
 
 # --- API Endpoints ---
 
@@ -212,6 +211,7 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
     # 3. Stream response from LLM
     try:
         response_stream_iterator = llm_generator.generate_response_stream(
+            sys_prompy=request.sys_prompt,
             user_query=request.query_text,
             context_chunks=context_chunks_meta
         )

@@ -10,7 +10,7 @@
   * 保留代码块的层级上下文信息（如所属类、文件名、起止行号）。  
 * **混合检索策略 (Hybrid Search)**:  
   * 结合**向量检索** (基于FAISS，捕捉语义相似性) 和 **稀疏检索** (基于BM25，擅长关键词精确匹配)。  
-  * 通过**倒数排序融合 (Reciprocal Rank Fusion \- RRF)** 算法智能合并两路检索结果，提升检索的召回率和准确率。  
+  * 通过**倒数排序融合 (Reciprocal Rank Fusion - RRF)** 算法智能合并两路检索结果，提升检索的召回率和准确率。  
 * **多语言支持 (可扩展)**:  
   * tree-sitter 的设计使其易于通过添加新的语言语法库来扩展支持的编程语言。  
 * **模块化与可配置设计**:  
@@ -21,93 +21,88 @@
 
 ## **项目结构**
 
-.  
-├── main.py                 \# API服务启动入口  
-├── requirements.txt        \# Python依赖  
-├── .env.example            \# 环境变量示例文件 (用户需复制为 .env)  
-├── config.example.yaml     \# 应用配置示例文件 (用户可选复制为 config.yaml)  
-├── grammars/               \# (可选) 存放手动编译的tree-sitter语法库 (.so, .dll)  
-│  
-└── src/                    \# 源代码目录  
-    ├── \_\_init\_\_.py         \# 使src成为一个包  
-    ├── api.py              \# FastAPI 应用接口定义  
-    ├── config.py           \# 项目配置加载与管理  
-    ├── pipeline.py         \# RAG核心处理流程编排 (RAGPipeline)  
-    │  
-    ├── data\_processing/    \# 数据预处理模块  
-    │   ├── \_\_init\_\_.py  
-    │   ├── document\_loader.py \# 从代码库加载和过滤文件 (LoadedDocument)  
-    │   └── chunkers.py        \# 智能代码分块 (TreeSitterChunker, TokenSplitter, DocumentChunk)  
-    │  
-    ├── indexing/           \# 索引构建模块  
-    │   ├── \_\_init\_\_.py  
-    │   ├── vector\_index.py    \# 向量索引 (FaissVectorIndex, 使用FAISS)  
-    │   └── sparse\_index.py    \# 稀疏索引 (BM25Index, 使用rank\_bm25)  
-    │  
-    ├── retrieval/          \# 检索模块  
-    │   ├── \_\_init\_\_.py  
-    │   └── retriever.py       \# 混合检索器 (HybridRetriever)  
-    │  
-    ├── generation/         \# LLM生成模块  
-    │   ├── \_\_init\_\_.py  
-    │   └── generator.py       \# LLM交互与Prompt构建 (LLMGenerator)  
-    │  
-    └── templates/            \# Jinja2 Prompt模板目录  
-        └── rag\_prompt\_template.jinja2 \# 默认的RAG Prompt模板
+```
+.
+├── main.py                    # API服务启动入口
+├── requirements.txt           # Python依赖
+├── .env.example               # 环境变量示例文件 (用户需复制为 .env)
+├── config.example.yaml        # 应用配置示例文件 (用户可选复制为 config.yaml)
+├── grammars/                  # (可选) 存放手动编译的tree-sitter语法库 (.so, .dll)
+│
+└── src/                       # 源代码目录
+    ├── __init__.py            # 使src成为一个包
+    ├── api.py                 # FastAPI 应用接口定义
+    ├── config.py              # 项目配置加载与管理
+    ├── pipeline.py            # RAG核心处理流程编排 (RAGPipeline)
+    │
+    ├── data_processing/       # 数据预处理模块
+    │   ├── __init__.py
+    │   ├── document_loader.py # 从代码库加载和过滤文件 (LoadedDocument)
+    │   └── chunkers.py        # 智能代码分块 (TreeSitterChunker, TokenSplitter, DocumentChunk)
+    │
+    ├── indexing/              # 索引构建模块
+    │   ├── __init__.py
+    │   ├── vector_index.py    # 向量索引 (FaissVectorIndex, 使用FAISS)
+    │   └── sparse_index.py    # 稀疏索引 (BM25Index, 使用rank_bm25)
+    │
+    ├── retrieval/             # 检索模块
+    │   ├── __init__.py
+    │   └── retriever.py       # 混合检索器 (HybridRetriever)
+    │
+    ├── generation/            # LLM生成模块
+    │   ├── __init__.py
+    │   └── generator.py       # LLM交互与Prompt构建 (LLMGenerator)
+    │
+    └── templates/             # Jinja2 Prompt模板目录
+        └── rag_prompt_template.jinja2 # 默认的RAG Prompt模板
+```
 
 ## **🚀 快速开始**
 
 1. **克隆项目**:  
-   git clone \<your-repository-url\>  
-   cd \<project-directory\>
+   git clone <your-repository-url>  
+   cd <project-directory>
 
 2. **创建并激活虚拟环境** (推荐):  
-   python \-m venv venv  
-   source venv/bin/activate  \# Linux/macOS  
-   \# venv\\Scripts\\activate    \# Windows
+   python -m venv venv  
+   source venv/bin/activate  # Linux/macOS
 
 3. **安装依赖**:  
-   pip install \-r requirements.txt
-
-4. 安装 tree-sitter 语言语法库:  
-   你需要为你希望分析的编程语言安装相应的 tree-sitter 语法绑定。例如，对于Python, Java, 和 JavaScript:  
-   pip install tree-sitter-python tree-sitter-java tree-sitter-javascript tree-sitter-typescript  
-   \# 或者使用 tree-sitter-languages 包  
-   \# pip install tree-sitter-languages
+   pip install -r requirements.txt
 
    如果某些语言没有预编译的pip包，你可能需要从源码编译其 tree-sitter 语法库，并将生成的共享库文件（如 .so 或 .dll）放置在 grammars/ 目录，并在 config.yaml (或 src/config.py) 中进行相应配置。  
-5. **配置环境**:  
-   * 复制 .env.example 为 .env，并填入你的API密钥 (如 OPENAI\_API\_KEY, GOOGLE\_API\_KEY 等)。  
+4. **配置环境**:  
+   **编辑 .env 文件**
+   * 复制 .env.example 为 .env，并填入你的API密钥 (如 OPENAI_API_KEY 等)。  
      cp .env.example .env  
-     \# 编辑 .env 文件
 
+   **编辑 config.yaml 文件**
    * (可选) 复制 config.yaml.example 为 config.yaml，并根据需要修改应用配置（如模型名称、路径、分块参数等）。  
      cp config.yaml.example config.yaml  
-     \# 编辑 config.yaml 文件
+     
 
-6. **启动API服务**:  
+5. **启动API服务**:  
    python main.py
 
-   服务默认运行在 http://0.0.0.0:8000 (具体请参考 src/config.py 中的 API\_HOST 和 API\_PORT 设置)。  
-7. **使用API**:  
+   服务默认运行在 http://0.0.0.0:8000 (具体请参考 src/config.py 中的 API_HOST 和 API_PORT 设置)。  
+6. **使用API**:  
    * 设置并索引仓库:  
      向 POST /repository/setup 端点发送请求。  
      请求体示例:  
      {  
-       "repo\_id": "my\_test\_repo\_loguru",  
-       "repo\_url\_or\_path": "https://github.com/loguru/loguru.git",  
-       "force\_reclone": false,  
-       "force\_reindex": false  
+       "repo_id": "bella-issues-bot",  
+       "repo_url_or_path": "https://github.com/bella-top/bella-issues-bot.git",  
+       "force_reclone": false,  
+       "force_reindex": false  
      }  
-     \`\`\`repo\_id\` 是你为这个仓库指定的唯一标识符。
+     `repo_id` 是你为这个仓库指定的唯一标识符。
 
    * 查询已索引的仓库:  
      向 POST /query/stream 端点发送请求。  
      请求体示例:  
      {  
-       "repo\_id": "my\_test\_repo\_loguru",  
-       "query\_text": "How do I configure a FileSink in loguru?",  
-       "top\_n\_final": 3  
+       "repo_id": "bella-issues-bot",  
+       "query_text": "Introduce the workflow of bella-issues-bot"
      }
 
      响应将是LLM生成的流式文本。
@@ -137,7 +132,7 @@
   * **多向量表示与摘要增强 (Multi-Vector Representation & Summary Augmentation)**: 为代码块创建代码本身、注释、自动生成摘要等多种向量表示，增强检索匹配能力。  
   * **上下文窗口感知**: 动态处理超出LLM上下文窗口限制的检索内容（截断、摘要等）。  
 * **阶段二：前沿探索**  
-  * **构建代码知识图谱 (Code Knowledge Graph \- CKG)**: 抽取代码中的实体（文件、类、函数）和关系（调用、继承、导入），构建图谱以支持更深层次的代码依赖和影响分析。  
+  * **构建代码知识图谱 (Code Knowledge Graph - CKG)**: 抽取代码中的实体（文件、类、函数）和关系（调用、继承、导入），构建图谱以支持更深层次的代码依赖和影响分析。  
   * **控制流与数据流分析**: 结合更深入的程序分析技术，理解代码执行逻辑。
 
 ## **🤝 贡献**

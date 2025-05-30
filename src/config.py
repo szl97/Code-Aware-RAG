@@ -116,10 +116,13 @@ EMBEDDING_DIMENSIONS = get_config_value("embedding.dimensions", 1536, "RAG_EMBED
 EMBEDDING_BATCH_SIZE = get_config_value("embedding.batch_size", 32, "RAG_EMBEDDING_BATCH_SIZE")
 
 # --- Generator (LLM) Model Configuration ---
-GENERATOR_MODEL_PROVIDER = get_config_value("generator.provider", "openai", "RAG_GENERATOR_PROVIDER") # e.g., "openai", "google"
 GENERATOR_MODEL_NAME = get_config_value("generator.model_name", "gpt-4o-mini", "RAG_GENERATOR_MODEL_NAME")
 GENERATOR_TEMPERATURE = get_config_value("generator.temperature", 0.7, "RAG_GENERATOR_TEMPERATURE")
-GENERATOR_MAX_TOKENS = get_config_value("generator.max_output_tokens", 1024, "RAG_GENERATOR_MAX_TOKENS")
+GENERATOR_PROMPT = get_config_value("generator.prompt", """
+You are an expert AI assistant specializing in analyzing and explaining code repositories.
+Your responses should be accurate, concise, and directly answer the user's query based on the provided context.
+Format your answers using Markdown. Cite specific file paths or code constructs when relevant.
+""", "RAG_GENERATOR_PROMPT")
 
 # --- Tree-sitter Configuration ---
 # List of supported languages for AST chunking and their grammar file names (if manually managed)
@@ -155,8 +158,8 @@ METADATA_FILENAME = get_config_value("indexing.faiss.metadata_filename", "metada
 BM25_INDEX_FILENAME = get_config_value("indexing.bm25.filename", "bm25_index.pkl")
 
 # --- Retrieval Configuration ---
-RETRIEVAL_VECTOR_TOP_K = get_config_value("retrieval.vector_top_k", 10, "RAG_RETRIEVAL_VECTOR_TOP_K")
-RETRIEVAL_BM25_TOP_K = get_config_value("retrieval.bm25_top_k", 10, "RAG_RETRIEVAL_BM25_TOP_K")
+RETRIEVAL_VECTOR_TOP_K = get_config_value("retrieval.vector_top_k", 20, "RAG_RETRIEVAL_VECTOR_TOP_K")
+RETRIEVAL_BM25_TOP_K = get_config_value("retrieval.bm25_top_k", 5, "RAG_RETRIEVAL_BM25_TOP_K")
 # RRF k parameter (controls how many documents from each retriever are considered in fusion, not the final k)
 # RRF usually uses a small constant like 60 for its internal calculations, not directly related to final top-k.
 # The final number of documents to LLM will be controlled by a re-ranker or a simple slice.
@@ -187,14 +190,12 @@ def log_important_configs():
     logger.info("--- Key Configurations ---")
     logger.info(f"Project Root: {PROJECT_ROOT}")
     logger.info(f"Data Directory: {DATA_DIR}")
-    logger.info(f"Embedding Model: {EMBEDDING_MODEL_PROVIDER} / {EMBEDDING_MODEL_NAME}")
-    logger.info(f"Generator Model: {GENERATOR_MODEL_PROVIDER} / {GENERATOR_MODEL_NAME}")
+    logger.info(f"Embedding Model: {EMBEDDING_MODEL_NAME}")
+    logger.info(f"Generator Model: {GENERATOR_MODEL_NAME}")
     logger.info(f"Supported AST Languages: {list(TREE_SITTER_LANGUAGES.keys())}")
     logger.info(f"API Server: http://{API_HOST}:{API_PORT}")
-    if not OPENAI_API_KEY and (EMBEDDING_MODEL_PROVIDER == "openai" or GENERATOR_MODEL_PROVIDER == "openai"):
-        logger.warning("OpenAI API key is not set, but OpenAI is configured as a provider.")
-    if not GOOGLE_API_KEY and (EMBEDDING_MODEL_PROVIDER == "google" or GENERATOR_MODEL_PROVIDER == "google"):
-        logger.warning("Google API key is not set, but Google is configured as a provider.")
+    if not OPENAI_API_KEY:
+        logger.warning("OpenAI API key is not set")
     logger.info("--- End Key Configurations ---")
 
 # Call at the end of the module to log configs when imported

@@ -71,7 +71,7 @@ class BM25Index:
         for i_original, chunk in enumerate(chunks):
             if i_original not in valid_indices:
                 continue
-            meta_item = chunk.model_dump(exclude={'content', 'absolute_path'})
+            meta_item = chunk.model_dump(exclude={'absolute_path'})
             meta_item['original_file_path'] = str(chunk.original_file_path)
             meta_item['file_path'] = str(chunk.file_path)
             # The 'id' here corresponds to the index in self.chunk_corpus_tokenized and self.chunk_metadata

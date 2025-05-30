@@ -5,17 +5,11 @@ from typing import List, Tuple, Optional, Dict, Any
 import faiss
 import numpy as np
 from loguru import logger
-from sentence_transformers import SentenceTransformer  # For HuggingFace embeddings
 
-# Import configurations and DocumentChunk model
 from src import config
 from src.data_processing.chunkers import DocumentChunk  # Pydantic model for chunks
 
-# --- Embedding Client Abstraction (Simplified) ---
-# In a larger system, you might have a more formal embedding client factory
-# or separate classes for each provider (OpenAI, Google, HuggingFace).
 
-_hf_embedding_models: Dict[str, SentenceTransformer] = {}
 _openai_client = None # Placeholder for OpenAI client if used
 
 def get_openai_client():
@@ -40,79 +34,38 @@ def get_openai_client():
             raise
     return _openai_client
 
-def get_huggingface_model(model_name: str) -> SentenceTransformer:
-    """Loads and caches a HuggingFace SentenceTransformer model."""
-    if model_name not in _hf_embedding_models:
-        try:
-            logger.info(f"Loading HuggingFace embedding model: {model_name}")
-            _hf_embedding_models[model_name] = SentenceTransformer(model_name)
-            logger.info(f"HuggingFace model '{model_name}' loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load HuggingFace model {model_name}: {e}")
-            raise
-    return _hf_embedding_models[model_name]
-
 def generate_embeddings(
         texts: List[str],
-        provider: str = config.EMBEDDING_MODEL_PROVIDER,
         model_name: str = config.EMBEDDING_MODEL_NAME,
         batch_size: int = config.EMBEDDING_BATCH_SIZE
 ) -> Optional[np.ndarray]:
     """
     Generates embeddings for a list of texts using the configured provider.
     """
-    embeddings_list = []
     if not texts:
         return np.array([])
 
-    logger.info(f"Generating embeddings for {len(texts)} texts using {provider}/{model_name} (batch size: {batch_size}).")
+    logger.info(f"Generating embeddings for {len(texts)} texts using {model_name} (batch size: {batch_size}).")
 
-    if provider == "openai":
-        client = get_openai_client()
-        all_embeddings = []
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i + batch_size]
-            try:
-                response = client.embeddings.create(
-                    input=batch_texts,
-                    model=model_name,
-                    encoding_format="float",
-                    dimensions=config.EMBEDDING_DIMENSIONS # some models support this
-                )
-                batch_embeddings = [item.embedding for item in response.data]
-                all_embeddings.extend(batch_embeddings)
-                logger.debug(f"Generated embeddings for batch {i//batch_size + 1}")
-            except Exception as e:
-                logger.error(f"Error generating OpenAI embeddings for batch: {e}")
-                # Decide on error handling: skip batch, return None, or raise
-                return None # Or handle more gracefully
-        embeddings_list = all_embeddings
-
-    elif provider == "huggingface":
-        model = get_huggingface_model(model_name)
+    client = get_openai_client()
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i + batch_size]
         try:
-            # SentenceTransformer handles batching internally if given a list of sentences
-            hf_embeddings = model.encode(texts, batch_size=batch_size, show_progress_bar=True)
-            embeddings_list = hf_embeddings.tolist() # Convert to list of lists
-            logger.info("HuggingFace embeddings generated successfully.")
+            response = client.embeddings.create(
+                input=batch_texts,
+                model=model_name,
+                encoding_format="float",
+                dimensions=config.EMBEDDING_DIMENSIONS # some models support this
+            )
+            batch_embeddings = [item.embedding for item in response.data]
+            all_embeddings.extend(batch_embeddings)
+            logger.debug(f"Generated embeddings for batch {i//batch_size + 1}")
         except Exception as e:
-            logger.error(f"Error generating HuggingFace embeddings: {e}")
-            return None
-
-    # elif provider == "google":
-    #     # Placeholder for Google Generative AI embeddings
-    #     # You would use the google.generativeai library here
-    #     # import google.generativeai as genai
-    #     # genai.configure(api_key=config.GOOGLE_API_KEY)
-    #     # for text_batch in [texts[i:i+batch_size] for i in range(0, len(texts), batch_size)]:
-    #     #     result = genai.embed_content(model=model_name, content=text_batch, task_type="RETRIEVAL_DOCUMENT") # or "SEMANTIC_SIMILARITY"
-    #     #     embeddings_list.extend(result['embedding'])
-    #     logger.warning("Google embedding provider not fully implemented in this example.")
-    #     return None # Or implement fully
-
-    else:
-        logger.error(f"Unsupported embedding provider: {provider}")
-        return None
+            logger.error(f"Error generating OpenAI embeddings for batch: {e}")
+            # Decide on error handling: skip batch, return None, or raise
+            return None # Or handle more gracefully
+    embeddings_list = all_embeddings
 
     if not embeddings_list:
         logger.warning("No embeddings were generated.")
@@ -183,7 +136,7 @@ class FaissVectorIndex:
         self.chunk_metadata = []
         for i, chunk in enumerate(chunks):
             # Store essential metadata. Convert Path objects to strings for JSON serialization.
-            meta_item = chunk.model_dump(exclude={'content', 'absolute_path'}) # Exclude large fields or non-serializable
+            meta_item = chunk.model_dump(exclude={'absolute_path'}) # Exclude large fields or non-serializable
             meta_item['original_file_path'] = str(chunk.original_file_path)
             meta_item['file_path'] = str(chunk.file_path) # This is the chunk's unique path
             meta_item['vector_id'] = i # Simple mapping: vector index in FAISS = index in this list
@@ -287,7 +240,6 @@ class FaissVectorIndex:
 if __name__ == "__main__":
     from src.data_processing.chunkers import DocumentChunk
     from pathlib import Path
-
     logger.remove()
     logger.add(lambda msg: print(msg, end=""), level="INFO")
 
@@ -343,4 +295,3 @@ if __name__ == "__main__":
     # if test_index_dir.exists():
     #     shutil.rmtree(test_index_dir)
     #     logger.info(f"Cleaned up test index directory: {test_index_dir}")
-
