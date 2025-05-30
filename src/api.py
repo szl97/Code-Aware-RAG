@@ -55,6 +55,9 @@ class QueryRequest(BaseModel):
     sys_prompt: Optional[str] = Field(config.GENERATOR_PROMPT, description="The system query for LLM generation.")
     query_text: str = Field(..., description="The user's query about the code repository.")
     top_n_final: Optional[int] = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Number of final context chunks to consider for generation.")
+    indexes: list[str] = Field(config.RETRIEVAL_INDEXES, description="The indexes which is enabled for retrieval.")
+    vector_top_k: int = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Top_k for vector index.")
+    bm25_top_k: int = Field(config.BM25_INDEX_FILENAME, description="Top_k for bm25 sparse index.")
 
 
 # --- API Endpoints ---
@@ -156,6 +159,7 @@ async def setup_repository_endpoint(request: RepositorySetupRequest):
 
 @app.post("/query/stream")
 async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
+
     """
     Queries an already set up repository and streams the LLM's response.
     """
@@ -167,7 +171,7 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
         logger.warning(f"No active RAGPipeline found for repo_id: {repo_id}. Repository might not be set up.")
         # Attempt to create and load on the fly if indexes exist
         try:
-            pipeline = RAGPipeline(repo_id=repo_id)
+            pipeline = RAGPipeline(repo_id=repo_id, indexes=request.indexes)
             if not pipeline.retriever.vector_index and not pipeline.retriever.bm25_index:
                 # This means _load_indexes inside HybridRetriever failed to find existing indexes
                 raise HTTPException(status_code=404, detail=f"Repository with repo_id '{repo_id}' not found or not indexed. Please set it up first.")
@@ -192,7 +196,9 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
         # Direct call (can block if retrieval is very slow, though usually fast)
         context_chunks_meta: List[Dict[str, Any]] = pipeline.query(
             query_text=request.query_text,
-            top_n_final=request.top_n_final
+            top_n_final=request.top_n_final,
+            vector_top_k=request.vector_top_k,
+            bm25_top_k=request.bm25_top_k
         )
         logger.info(f"Retrieved {len(context_chunks_meta)} context chunks for query.")
 

@@ -165,6 +165,8 @@ RETRIEVAL_BM25_TOP_K = get_config_value("retrieval.bm25_top_k", 5, "RAG_RETRIEVA
 # The final number of documents to LLM will be controlled by a re-ranker or a simple slice.
 RRF_CONSTANT_K = get_config_value("retrieval.rrf_k_constant", 60) # RRF k parameter
 
+RETRIEVAL_INDEXES = get_config_value("retrieval.indexes", ["vector", "bm25"], "RAG_RETRIEVAL_INDEXES")
+
 # --- File Processing Configuration ---
 # Default excluded directories and files (can be extended in config.yaml)
 DEFAULT_EXCLUDED_DIRS: List[str] = get_config_value("file_processing.default_excluded_dirs", [

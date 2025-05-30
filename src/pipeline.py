@@ -25,6 +25,7 @@ class RAGPipeline:
     def __init__(
             self,
             repo_id: str, # A unique identifier for the repository being processed/queried
+            indexes: list[str] = config.RETRIEVAL_INDEXES,
             index_base_dir: Path = config.INDEX_DIR,
             repos_base_dir: Path = config.REPOS_DIR,
     ):
@@ -36,6 +37,7 @@ class RAGPipeline:
                            to create a dedicated subdirectory within the index_base_dir
                            and repos_base_dir. For example, if repo_url is
                            "https://github.com/user/myrepo", repo_id could be "user_myrepo".
+            indexes (list[str]): The indexes types used by retriever.
             index_base_dir (Path): The base directory where all indexes are stored.
             repos_base_dir (Path): The base directory where cloned repositories are stored.
         """
@@ -57,8 +59,9 @@ class RAGPipeline:
 
         # Initialize components (they will load indexes if they exist)
         self.chunker = CodeRAGChunker()
+        self.indexes = indexes
         # The retriever will try to load indexes from its self.index_dir upon initialization
-        self.retriever = HybridRetriever(index_dir=self.index_dir)
+        self.retriever = HybridRetriever(index_dir=self.index_dir, indexes=self.indexes)
 
 
     def setup_repository(
@@ -178,27 +181,30 @@ class RAGPipeline:
 
         return True
 
-    def query(self, query_text: str, top_n_final: Optional[int] = None) -> List[Dict[str, Any]]:
+    def query(self,
+              query_text: str,
+              top_n_final: Optional[int] = None,
+              vector_top_k: Optional[int] = None,
+              bm25_top_k: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Performs a hybrid retrieval query against the configured repository's indexes.
 
         Args:
             query_text (str): The user's query.
-            top_n_final (Optional[int]): The final number of documents to return.
-
+            top_n_final (Optional[int]): The final number of top documents to return after fusion.
+                                         Defaults to self.vector_top_k or self.bm25_top_k (whichever is larger).
+            vector_top_k (Optional[int]): vector_top_k
+            bm25_top_k (Optional[int]): bm25_top_k
         Returns:
             List[Dict[str, Any]]: A list of fused and ranked chunk metadata.
         """
-        if not self.retriever.vector_index and not self.retriever.bm25_index:
-            logger.error(f"Indexes for repo_id '{self.repo_id}' are not loaded. Cannot query. Please run setup_repository first.")
-            # Attempt to load them if they exist on disk
-            if self.retriever._load_indexes():
-                logger.info("Indexes loaded successfully on demand.")
-            else:
-                logger.error(f"Failed to load indexes on demand for repo_id '{self.repo_id}'.")
-                return []
+        if self.retriever._load_indexes():
+            logger.info("Indexes loaded successfully on demand.")
+        else:
+            logger.error(f"Failed to load indexes on demand for repo_id '{self.repo_id}'.")
+            return []
 
-        return self.retriever.retrieve(query_text, top_n_final=top_n_final)
+        return self.retriever.retrieve(query_text, top_n_final=top_n_final, vector_top_k=vector_top_k, bm25_top_k=bm25_top_k)
 
 
 # --- Example Usage ---

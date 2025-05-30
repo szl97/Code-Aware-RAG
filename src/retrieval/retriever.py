@@ -19,11 +19,13 @@ class HybridRetriever:
     def __init__(
             self,
             index_dir: Path = config.INDEX_DIR,
+            indexes: list[str] = config.RETRIEVAL_INDEXES,
             vector_top_k: int = config.RETRIEVAL_VECTOR_TOP_K,
             bm25_top_k: int = config.RETRIEVAL_BM25_TOP_K,
             rrf_k_constant: int = config.RRF_CONSTANT_K # RRF k parameter
     ):
         self.index_dir = index_dir
+        self.indexes = indexes
         self.vector_top_k = vector_top_k
         self.bm25_top_k = bm25_top_k
         self.rrf_k_constant = rrf_k_constant # Constant for RRF scoring
@@ -37,29 +39,31 @@ class HybridRetriever:
         """Loads both vector and sparse indexes."""
         logger.info(f"Initializing and loading indexes from: {self.index_dir}")
 
-        # Load Vector Index
-        try:
-            self.vector_index = FaissVectorIndex(index_dir=self.index_dir, embedding_dim=config.EMBEDDING_DIMENSIONS)
-            if not self.vector_index.load_index():
-                logger.error("Failed to load FaissVectorIndex. Vector search will not be available.")
-                self.vector_index = None # Ensure it's None if load fails
-            else:
-                logger.info("FaissVectorIndex loaded successfully.")
-        except Exception as e:
-            logger.error(f"Exception during FaissVectorIndex initialization or loading: {e}")
-            self.vector_index = None
+        if "vector" in self.indexes:
+            # Load Vector Index
+            try:
+                self.vector_index = FaissVectorIndex(index_dir=self.index_dir, embedding_dim=config.EMBEDDING_DIMENSIONS)
+                if not self.vector_index.load_index():
+                    logger.error("Failed to load FaissVectorIndex. Vector search will not be available.")
+                    self.vector_index = None # Ensure it's None if load fails
+                else:
+                    logger.info("FaissVectorIndex loaded successfully.")
+            except Exception as e:
+                logger.error(f"Exception during FaissVectorIndex initialization or loading: {e}")
+                self.vector_index = None
 
-        # Load BM25 Index
-        try:
-            self.bm25_index = BM25Index(index_dir=self.index_dir)
-            if not self.bm25_index.load_index():
-                logger.error("Failed to load BM25Index. Sparse search will not be available.")
-                self.bm25_index = None # Ensure it's None if load fails
-            else:
-                logger.info("BM25Index loaded successfully.")
-        except Exception as e:
-            logger.error(f"Exception during BM25Index initialization or loading: {e}")
-            self.bm25_index = None
+        if "bm25" in self.indexes:
+            # Load BM25 Index
+            try:
+                self.bm25_index = BM25Index(index_dir=self.index_dir)
+                if not self.bm25_index.load_index():
+                    logger.error("Failed to load BM25Index. Sparse search will not be available.")
+                    self.bm25_index = None # Ensure it's None if load fails
+                else:
+                    logger.info("BM25Index loaded successfully.")
+            except Exception as e:
+                logger.error(f"Exception during BM25Index initialization or loading: {e}")
+                self.bm25_index = None
 
         if self.vector_index and self.bm25_index:
             # Basic consistency check: metadata count.
@@ -71,18 +75,24 @@ class HybridRetriever:
                     "This might indicate issues if they are supposed to be perfectly aligned."
                 )
             return True
-        elif self.vector_index:
+        elif not self.bm25_index and "bm25" in self.indexes:
             logger.warning("Only Vector Index was loaded. BM25 search will be skipped.")
-            return True
-        elif self.bm25_index:
+            return False
+        elif not self.vector_index and "vector" in self.indexes:
             logger.warning("Only BM25 Index was loaded. Vector search will be skipped.")
-            return True
-        else:
+            return False
+        elif not self.vector_index and not self.bm25_index:
             logger.error("Neither Vector Index nor BM25 Index could be loaded. Retrieval will not work.")
             return False
+        else:
+            return True
 
 
-    def retrieve(self, query_text: str, top_n_final: Optional[int] = None) -> List[Dict[str, Any]]:
+    def retrieve(self,
+                 query_text: str,
+                 top_n_final: Optional[int] = None,
+                 vector_top_k: Optional[int] = None,
+                 bm25_top_k: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Performs hybrid retrieval for a given query.
 
@@ -90,6 +100,8 @@ class HybridRetriever:
             query_text (str): The user's query.
             top_n_final (Optional[int]): The final number of top documents to return after fusion.
                                          Defaults to self.vector_top_k or self.bm25_top_k (whichever is larger).
+            vector_top_k (Optional[int]): vector_top_k
+            bm25_top_k (Optional[int]): bm25_top_k
 
         Returns:
             List[Dict[str, Any]]: A list of fused and ranked chunk metadata dictionaries.
@@ -98,6 +110,12 @@ class HybridRetriever:
         if not self.vector_index and not self.bm25_index:
             logger.error("No indexes are loaded. Cannot retrieve.")
             return []
+
+        if vector_top_k:
+            self.vector_top_k = vector_top_k
+
+        if bm25_top_k:
+            self.bm25_top_k = bm25_top_k
 
         if top_n_final is None:
             top_n_final = max(self.vector_top_k, self.bm25_top_k, 5) # Default to at least 5 if k's are small
