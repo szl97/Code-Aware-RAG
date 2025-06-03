@@ -22,13 +22,17 @@ class HybridRetriever:
             indexes: list[str] = config.RETRIEVAL_INDEXES,
             vector_top_k: int = config.RETRIEVAL_VECTOR_TOP_K,
             bm25_top_k: int = config.RETRIEVAL_BM25_TOP_K,
-            rrf_k_constant: int = config.RRF_CONSTANT_K # RRF k parameter
+            rrf_k_constant: int = config.RRF_CONSTANT_K, # RRF k parameter
+            model_name: str = config.GENERATOR_MODEL_NAME,
+            temperature: float = config.GENERATOR_TEMPERATURE
     ):
         self.index_dir = index_dir
         self.indexes = indexes
         self.vector_top_k = vector_top_k
         self.bm25_top_k = bm25_top_k
         self.rrf_k_constant = rrf_k_constant # Constant for RRF scoring
+        self.model_name = model_name
+        self.temperature = temperature
 
         self.vector_index: Optional[FaissVectorIndex] = None
         self.bm25_index: Optional[BM25Index] = None
@@ -87,6 +91,30 @@ class HybridRetriever:
         else:
             return True
 
+
+    async def rewrite_query(self, sys_prompt: str, user_query: str) -> str:
+        client = config.get_openai_llm_client()
+        result = ""
+        try:
+            stream = await client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_query}
+                ],
+                temperature=self.temperature,
+                stream=True
+            )
+            async for chunk in stream:
+                if len(chunk.choices) > 0:
+                    content = chunk.choices[0].delta.content
+                    if content is not None:
+                        result += content
+            logger.info("OpenAI streaming response finished.")
+            return result
+        except Exception as e:
+            logger.error(f"Error during OpenAI streaming: {e}")
+            return f"\nAn error occurred with the OpenAI API: {str(e)}"
 
     def retrieve(self,
                  query_text: str,

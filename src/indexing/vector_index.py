@@ -9,31 +9,6 @@ from loguru import logger
 from src import config
 from src.data_processing.chunkers import DocumentChunk  # Pydantic model for chunks
 
-
-_openai_client = None # Placeholder for OpenAI client if used
-
-def get_openai_client():
-    """Initializes and returns an OpenAI client."""
-    global _openai_client
-    if _openai_client is None:
-        if not config.OPENAI_API_KEY:
-            logger.error("OpenAI API key not configured. Cannot use OpenAI embeddings.")
-            raise ValueError("OpenAI API key not set.")
-        try:
-            from openai import OpenAI
-            if not config.OPENAI_BASE_URL:
-                _openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
-            else:
-                _openai_client = OpenAI(api_key=config.OPENAI_API_KEY, base_url=config.OPENAI_BASE_URL)
-            logger.info("OpenAI client initialized.")
-        except ImportError:
-            logger.error("OpenAI Python package not installed. `pip install openai`")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
-            raise
-    return _openai_client
-
 def generate_embeddings(
         texts: List[str],
         model_name: str = config.EMBEDDING_MODEL_NAME,
@@ -47,7 +22,7 @@ def generate_embeddings(
 
     logger.info(f"Generating embeddings for {len(texts)} texts using {model_name} (batch size: {batch_size}).")
 
-    client = get_openai_client()
+    client = config.get_openai_embeddings_client()
     all_embeddings = []
     for i in range(0, len(texts), batch_size):
         batch_texts = texts[i:i + batch_size]

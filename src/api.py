@@ -51,12 +51,14 @@ class RepositorySetupResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     repo_id: str = Field(..., description="The unique identifier of the repository to query (must have been set up first).")
-    sys_prompt: Optional[str] = Field(config.GENERATOR_PROMPT, description="The system query for LLM generation.")
+    sys_prompt: str = Field(config.GENERATOR_PROMPT, description="The system query for LLM generation.")
     query_text: str = Field(..., description="The user's query about the code repository.")
-    top_n_final: Optional[int] = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Number of final context chunks to consider for generation.")
+    top_n_final: int = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Number of final context chunks to consider for generation.")
     indexes: list[str] = Field(config.RETRIEVAL_INDEXES, description="The indexes which is enabled for retrieval.")
     vector_top_k: int = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Top_k for vector index.")
     bm25_top_k: int = Field(config.RETRIEVAL_BM25_TOP_K, description="Top_k for bm25 sparse index.")
+    rewrite_query: Optional[str] = Field(None, description="Rewrite query for retrieval.")
+    rewrite_prompt: Optional[str] = Field(None, description="Prompt used to rewrite query for retrieval.")
 
 
 # --- API Endpoints ---
@@ -181,10 +183,13 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
         #     query_text=request.query_text,
         #     top_n_final=request.top_n_final
         # )
-
-        # Direct call (can block if retrieval is very slow, though usually fast)
+        retriever_query = request.query_text
+        if request.rewrite_query:
+            retriever_query = request.rewrite_query
+        elif request.rewrite_prompt:
+            retriever_query = await pipeline.retriever.rewrite_query(sys_prompt=request.rewrite_prompt, user_query=request.query_text)
         context_chunks_meta: List[Dict[str, Any]] = pipeline.query(
-            query_text=request.query_text,
+            query_text=retriever_query,
             top_n_final=request.top_n_final,
             vector_top_k=request.vector_top_k,
             bm25_top_k=request.bm25_top_k

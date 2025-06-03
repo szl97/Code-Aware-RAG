@@ -200,5 +200,40 @@ def log_important_configs():
         logger.warning("OpenAI API key is not set")
     logger.info("--- End Key Configurations ---")
 
+
+def get_openai_llm_client(apikey: Optional[str] = None, baseurl: Optional[str] = None):
+    """Initializes and returns an OpenAI client for LLM generation."""
+    if not apikey and not OPENAI_API_KEY:
+        logger.error("OpenAI API key not configured. Cannot use OpenAI for generation.")
+        raise ValueError("OpenAI API key not set.")
+    try:
+        from openai import AsyncOpenAI # Use AsyncOpenAI for FastAPI integration
+        _openai_llm_client = AsyncOpenAI(api_key=apikey or OPENAI_API_KEY, base_url=baseurl or OPENAI_BASE_URL)
+        logger.info("AsyncOpenAI client for LLM generation initialized.")
+    except ImportError:
+        logger.error("OpenAI Python package not installed. `pip install openai`")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to initialize AsyncOpenAI client: {e}")
+        raise
+    return _openai_llm_client
+
+def get_openai_embeddings_client(apikey: Optional[str] = None, baseurl: Optional[str] = None):
+    """Initializes and returns an OpenAI client."""
+    if not apikey and not OPENAI_API_KEY:
+        logger.error("OpenAI API key not configured. Cannot use OpenAI embeddings.")
+        raise ValueError("OpenAI API key not set.")
+    try:
+        from openai import OpenAI
+        _openai_client = OpenAI(api_key=apikey or OPENAI_API_KEY, base_url=baseurl or OPENAI_BASE_URL)
+        logger.info("OpenAI client initialized.")
+    except ImportError:
+        logger.error("OpenAI Python package not installed. `pip install openai`")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client: {e}")
+        raise
+    return _openai_client
+
 # Call at the end of the module to log configs when imported
 log_important_configs()

@@ -9,33 +9,6 @@ from pydantic import json
 from src import config
 from src.data_processing.chunkers import DocumentChunk
 
-# --- LLM Client Abstraction (Simplified) ---
-# Similar to embedding, a more formal factory or separate classes might be used in a larger system.
-_openai_llm_client = None
-_google_llm_model = None # For Google's GenerativeModel
-
-def get_openai_llm_client():
-    """Initializes and returns an OpenAI client for LLM generation."""
-    global _openai_llm_client
-    if _openai_llm_client is None:
-        if not config.OPENAI_API_KEY:
-            logger.error("OpenAI API key not configured. Cannot use OpenAI for generation.")
-            raise ValueError("OpenAI API key not set.")
-        try:
-            from openai import AsyncOpenAI # Use AsyncOpenAI for FastAPI integration
-            if not config.OPENAI_BASE_URL:
-                _openai_llm_client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
-            else:
-                _openai_llm_client = AsyncOpenAI(api_key=config.OPENAI_API_KEY, base_url=config.OPENAI_BASE_URL)
-            logger.info("AsyncOpenAI client for LLM generation initialized.")
-        except ImportError:
-            logger.error("OpenAI Python package not installed. `pip install openai`")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to initialize AsyncOpenAI client: {e}")
-            raise
-    return _openai_llm_client
-
 # --- Prompt Templating ---
 # Assume prompt templates are stored in a 'templates' directory within 'src'
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
@@ -149,7 +122,7 @@ class LLMGenerator:
 
         logger.info(f"Generating streaming response from {self.model_name}...")
 
-        client = get_openai_llm_client()
+        client = config.get_openai_llm_client()
         try:
             stream = await client.chat.completions.create(
                 model=self.model_name,
@@ -185,7 +158,7 @@ class LLMGenerator:
 
         full_response_text = ""
 
-        client = get_openai_llm_client()
+        client = config.get_openai_llm_client()
         try:
             completion = await client.chat.completions.create(
                 model=self.model_name,
