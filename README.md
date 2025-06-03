@@ -71,6 +71,9 @@
    pip install -r requirements.txt
 
    如果某些语言没有预编译的pip包，你可能需要从源码编译其 tree-sitter 语法库，并将生成的共享库文件（如 .so 或 .dll）放置在 grammars/ 目录，并在 config.yaml (或 src/config.py) 中进行相应配置。  
+
+   请运行 python download_nltk_data.py 下载NLTK数据。
+
 4. **配置环境**:  
    **编辑 .env 文件**
    * 复制 .env.example 为 .env，并填入你的API密钥 (如 OPENAI_API_KEY 等)。  
@@ -129,7 +132,7 @@
 
 * **阶段一：高级优化**  
   * **上下文重排 (Context Re-ranking)**: 使用Cross-Encoder模型对初步检索结果进行重排序，提升送入LLM的上下文质量。  
-  * **多向量表示与摘要增强 (Multi-Vector Representation & Summary Augmentation)**: 为代码块创建代码本身、注释、自动生成摘要等多种向量表示，增强检索匹配能力。  
+  * **多向量表示与摘要增强 (Multi-Vector Representation & Summary Augmentation)**: 为代码块创建代码本身、自动生成摘要等多种向量表示，增强检索匹配能力。  
   * **上下文窗口感知**: 动态处理超出LLM上下文窗口限制的检索内容（截断、摘要等）。  
 * **阶段二：前沿探索**  
   * **构建代码知识图谱 (Code Knowledge Graph - CKG)**: 抽取代码中的实体（文件、类、函数）和关系（调用、继承、导入），构建图谱以支持更深层次的代码依赖和影响分析。  

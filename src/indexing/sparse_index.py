@@ -11,16 +11,43 @@ from rank_bm25 import BM25Okapi # Using the Okapi BM25 variant
 from src import config
 from src.data_processing.chunkers import DocumentChunk # Pydantic model for chunks
 
-# --- Simple Text Preprocessing for BM25 ---
+from src.utils.nlp_utils import NLPUtils as nlp
+
 def preprocess_text_for_bm25(text: str) -> List[str]:
     """
-    Simple preprocessing: lowercase and split by whitespace.
-    More advanced preprocessing (stemming, stopword removal) can be added if needed,
-    but often simple tokenization works well for BM25 with code/technical text.
+    Enhanced preprocessing for BM25:
+    - Remove extra spaces
+    - Stem the text
+    - Tokenize the text
+    - Remove stopwords
+    - Remove duplicates
+    - Generate trigrams
     """
     if not text:
         return []
-    return text.lower().split()
+    
+    # 文本预处理
+    text = nlp.removeExtraSpaces(text)
+    text = nlp.stem(text)
+    
+    # 分词处理
+    tokens = nlp.tokenize(text, True)
+    word_tokens = [token for token in tokens if token['type'] == 'word']
+    token_values = [token['value'] for token in word_tokens]
+    
+    # 词汇清理
+    cleaned_tokens = nlp.removeWords(word_tokens)
+    unique_tokens = nlp.setOfWords(cleaned_tokens)
+    unique_values = [token['value'] for token in unique_tokens]
+    
+    # 生成Trigram
+    cleaned_text = ' '.join(unique_values)
+    trigrams = nlp.ngram(cleaned_text, 3)
+
+    if trigrams:
+        return [str(value) for value in trigrams]
+
+    return [str(value) for value in unique_values]
 
 
 class BM25Index:

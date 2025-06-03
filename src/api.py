@@ -33,7 +33,6 @@ app.add_middleware(
 # For simplicity, we use a dictionary to store initialized pipelines by repo_id.
 # This means pipelines are stateful per API worker process.
 # Key: repo_id (str), Value: RAGPipeline instance
-active_pipelines: Dict[str, RAGPipeline] = {}
 pipeline_locks: Dict[str, asyncio.Lock] = {} # To prevent concurrent setup for the same repo_id
 
 # --- Pydantic Models for API Requests and Responses ---
@@ -57,7 +56,7 @@ class QueryRequest(BaseModel):
     top_n_final: Optional[int] = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Number of final context chunks to consider for generation.")
     indexes: list[str] = Field(config.RETRIEVAL_INDEXES, description="The indexes which is enabled for retrieval.")
     vector_top_k: int = Field(config.RETRIEVAL_VECTOR_TOP_K, description="Top_k for vector index.")
-    bm25_top_k: int = Field(config.BM25_INDEX_FILENAME, description="Top_k for bm25 sparse index.")
+    bm25_top_k: int = Field(config.RETRIEVAL_BM25_TOP_K, description="Top_k for bm25 sparse index.")
 
 
 # --- API Endpoints ---
@@ -88,17 +87,12 @@ async def setup_repository_endpoint(request: RepositorySetupRequest):
     async with pipeline_locks[repo_id]: # Ensure only one setup process for a repo_id at a time
         logger.info(f"Received setup request for repo_id: {repo_id}, source: {request.repo_url_or_path}")
 
-        pipeline = active_pipelines.get(repo_id)
-        if not pipeline:
-            try:
-                pipeline = RAGPipeline(repo_id=repo_id) # Initializes with correct index_dir
-                active_pipelines[repo_id] = pipeline
-                logger.info(f"Created new RAGPipeline instance for repo_id: {repo_id}")
-            except Exception as e:
-                logger.error(f"Failed to initialize RAGPipeline for {repo_id}: {e}")
-                raise HTTPException(status_code=500, detail=f"Pipeline initialization error: {str(e)}")
-        else:
-            logger.info(f"Using existing RAGPipeline instance for repo_id: {repo_id}")
+        try:
+            pipeline = RAGPipeline(repo_id=repo_id) # Initializes with correct index_dir
+            logger.info(f"Created new RAGPipeline instance for repo_id: {repo_id}")
+        except Exception as e:
+            logger.error(f"Failed to initialize RAGPipeline for {repo_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Pipeline initialization error: {str(e)}")
 
         try:
             # The setup_repository method is synchronous. For a truly non-blocking API,
@@ -166,20 +160,15 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
     repo_id = request.repo_id.replace("/", "_").replace(":", "_") # Sanitize
     logger.info(f"Received streaming query for repo_id: '{repo_id}', query: '{request.query_text[:50]}...'")
 
-    pipeline = active_pipelines.get(repo_id)
-    if not pipeline:
-        logger.warning(f"No active RAGPipeline found for repo_id: {repo_id}. Repository might not be set up.")
-        # Attempt to create and load on the fly if indexes exist
-        try:
-            pipeline = RAGPipeline(repo_id=repo_id, indexes=request.indexes)
-            if not pipeline.retriever.vector_index and not pipeline.retriever.bm25_index:
-                # This means _load_indexes inside HybridRetriever failed to find existing indexes
-                raise HTTPException(status_code=404, detail=f"Repository with repo_id '{repo_id}' not found or not indexed. Please set it up first.")
-            active_pipelines[repo_id] = pipeline # Cache it if successfully loaded
-            logger.info(f"Dynamically loaded RAGPipeline for repo_id: {repo_id} for query.")
-        except Exception as e:
-            logger.error(f"Failed to dynamically load RAGPipeline for {repo_id}: {e}")
+    try:
+        pipeline = RAGPipeline(repo_id=repo_id, indexes=request.indexes)
+        if not pipeline.retriever.vector_index and not pipeline.retriever.bm25_index:
+            # This means _load_indexes inside HybridRetriever failed to find existing indexes
             raise HTTPException(status_code=404, detail=f"Repository with repo_id '{repo_id}' not found or not indexed. Please set it up first.")
+        logger.info(f"Dynamically loaded RAGPipeline for repo_id: {repo_id} for query.")
+    except Exception as e:
+        logger.error(f"Failed to dynamically load RAGPipeline for {repo_id}: {e}")
+        raise HTTPException(status_code=404, detail=f"Repository with repo_id '{repo_id}' not found or not indexed. Please set it up first.")
 
 
     # 1. Retrieve context chunks

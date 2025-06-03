@@ -31,6 +31,7 @@ tree-sitter-typescript
 
 # **Sparse Retrieval**
 rank_bm25>=0.2.2
+nltk>=3.8.1 # For NLP operations like tokenization, stemming, and n-grams
 
 # **Configuration and Utilities**
 
