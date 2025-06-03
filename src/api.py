@@ -74,7 +74,7 @@ async def shutdown_event():
     logger.info("Code-Aware RAG API shutting down...")
     # Clean up resources if necessary
 
-@app.post("/repository/setup", response_model=RepositorySetupResponse)
+@app.post("/v1/code-rag/repository/setup", response_model=RepositorySetupResponse)
 async def setup_repository_endpoint(request: RepositorySetupRequest):
     """
     Sets up a repository: clones it (if a URL is provided) and builds its search indexes.
@@ -153,7 +153,7 @@ async def setup_repository_endpoint(request: RepositorySetupRequest):
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
-@app.post("/query/stream")
+@app.post("/v1/code-rag/query/stream")
 async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
 
     """
