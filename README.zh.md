@@ -108,7 +108,7 @@
      ```json
      {  
        "repo_id": "bella-issues-bot",  
-       "repo_url_or_path": "https://github.com/bella-top/bella-issues-bot.git",  
+       "repo_url_or_path": "https://github.com/szl97/bella-issues-bot.git",  
        "force_reclone": false,  
        "force_reindex": false  
      }  

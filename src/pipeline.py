@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # Use a unique repo_id for testing to avoid conflicts
     TEST_REPO_ID = "test_pipeline_repo_loguru"
     # Small, public repo for quick testing
-    TEST_REPO_URL = "https://github.com/bella-top/bella-issues-bot.git"
+    TEST_REPO_URL = "https://github.com/szl97/bella-issues-bot.git"
 
     # Alternative: Test with a local path
     # TEST_LOCAL_REPO_PATH_STR = "./test_repo_project_pipeline" # Create this path with some files
