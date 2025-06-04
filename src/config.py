@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Any
 from loguru import logger
 
 # --- Project Root ---
-# Determine the project root directory (assuming config.py is in src/)
+# Determine the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 # --- Load Environment Variables ---
