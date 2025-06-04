@@ -28,6 +28,8 @@ class RAGPipeline:
             indexes: list[str] = config.RETRIEVAL_INDEXES,
             index_base_dir: Path = config.INDEX_DIR,
             repos_base_dir: Path = config.REPOS_DIR,
+            model: str = config.GENERATOR_MODEL_NAME,
+            temperature: float = config.GENERATOR_TEMPERATURE
     ):
         """
         Initializes the RAG pipeline for a specific repository.
@@ -52,6 +54,8 @@ class RAGPipeline:
 
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self.cloned_repo_path.mkdir(parents=True, exist_ok=True)
+        self.model = model
+        self.temperature = temperature
 
         logger.info(f"RAGPipeline initialized for repo_id: '{self.repo_id}'.")
         logger.info(f"  Index directory: {self.index_dir}")
@@ -69,7 +73,8 @@ class RAGPipeline:
             repo_url_or_path: str,
             access_token: Optional[str] = None,
             force_reclone: bool = False,
-            force_reindex: bool = False
+            force_reindex: bool = False,
+            apikey: Optional[str] = None
     ) -> bool:
         """
         Sets up the repository: clones if it's a URL, then processes and indexes it.
@@ -127,9 +132,9 @@ class RAGPipeline:
             return True
 
         logger.info(f"Proceeding with indexing for repo_id '{self.repo_id}'. Force reindex: {force_reindex}")
-        return self._build_indexes_for_repository(force_rebuild=force_reindex)
+        return self._build_indexes_for_repository(force_rebuild=force_reindex, apikey=apikey)
 
-    def _build_indexes_for_repository(self, force_rebuild: bool = False) -> bool:
+    def _build_indexes_for_repository(self, force_rebuild: bool = False, apikey:Optional[str] = None) -> bool:
         """
         Internal method to load documents, chunk them, and build/save all indexes.
         """
@@ -164,7 +169,7 @@ class RAGPipeline:
         bm25_indexer = BM25Index(index_dir=self.index_dir)
 
         logger.info("Building Vector Index...")
-        if not vector_indexer.build_index(document_chunks, force_rebuild=force_rebuild):
+        if not vector_indexer.build_index(document_chunks, force_rebuild=force_rebuild, apikey=apikey):
             logger.error("Failed to build Vector Index.")
             return False
         logger.info("Vector Index built successfully.")
@@ -183,6 +188,7 @@ class RAGPipeline:
 
     def query(self,
               query_text: str,
+              apikey: Optional[str] =None,
               top_n_final: Optional[int] = None,
               vector_top_k: Optional[int] = None,
               bm25_top_k: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -204,7 +210,7 @@ class RAGPipeline:
             logger.error(f"Failed to load indexes on demand for repo_id '{self.repo_id}'.")
             return []
 
-        return self.retriever.retrieve(query_text, top_n_final=top_n_final, vector_top_k=vector_top_k, bm25_top_k=bm25_top_k)
+        return self.retriever.retrieve(query_text, top_n_final=top_n_final, vector_top_k=vector_top_k, bm25_top_k=bm25_top_k, apikey=apikey)
 
 
 # --- Example Usage ---

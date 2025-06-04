@@ -204,7 +204,7 @@ def log_important_configs():
 def get_openai_llm_client(apikey: Optional[str] = None, baseurl: Optional[str] = None):
     """Initializes and returns an OpenAI client for LLM generation."""
     if not apikey and not OPENAI_API_KEY:
-        logger.error("OpenAI API key not configured. Cannot use OpenAI for generation.")
+        logger.error("OpenAI API key not provided. Cannot use OpenAI for generation.")
         raise ValueError("OpenAI API key not set.")
     try:
         from openai import AsyncOpenAI # Use AsyncOpenAI for FastAPI integration
@@ -221,7 +221,7 @@ def get_openai_llm_client(apikey: Optional[str] = None, baseurl: Optional[str] =
 def get_openai_embeddings_client(apikey: Optional[str] = None, baseurl: Optional[str] = None):
     """Initializes and returns an OpenAI client."""
     if not apikey and not OPENAI_API_KEY:
-        logger.error("OpenAI API key not configured. Cannot use OpenAI embeddings.")
+        logger.error("OpenAI API key not provided. Cannot use OpenAI embeddings.")
         raise ValueError("OpenAI API key not set.")
     try:
         from openai import OpenAI

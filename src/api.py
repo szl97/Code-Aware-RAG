@@ -1,11 +1,12 @@
 import asyncio  # For managing pipeline instances
 from typing import List, Dict, Any, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
+from fastapi.security import OAuth2PasswordBearer
 
 # Import project modules
 from src import config  # To initialize logging and access configs
@@ -27,6 +28,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/api-doc/dummy-token-url")
 
 # --- Global State / Cache for RAG Pipelines ---
 # In a production system, this would be more robust (e.g., using Redis, a proper cache, or a manager class)
@@ -75,7 +78,7 @@ async def shutdown_event():
     # Clean up resources if necessary
 
 @app.post("/v1/code-rag/repository/setup", response_model=RepositorySetupResponse)
-async def setup_repository_endpoint(request: RepositorySetupRequest):
+async def setup_repository_endpoint(request: RepositorySetupRequest, apikey: Optional[str] = Depends(oauth2_scheme)):
     """
     Sets up a repository: clones it (if a URL is provided) and builds its search indexes.
     This operation can be time-consuming.
@@ -116,7 +119,8 @@ async def setup_repository_endpoint(request: RepositorySetupRequest):
                 repo_url_or_path=request.repo_url_or_path,
                 access_token=request.access_token,
                 force_reclone=request.force_reclone,
-                force_reindex=request.force_reindex
+                force_reindex=request.force_reindex,
+                apikey=apikey
             )
 
             if success:
@@ -154,7 +158,7 @@ async def setup_repository_endpoint(request: RepositorySetupRequest):
 
 
 @app.post("/v1/code-rag/query/stream")
-async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
+async def query_repository_stream(request: QueryRequest, apikey: Optional[str] = Depends(oauth2_scheme)) -> StreamingResponse:
 
     """
     Queries an already set up repository and streams the LLM's response.
@@ -187,12 +191,13 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
         if request.rewrite_query:
             retriever_query = request.rewrite_query
         elif request.rewrite_prompt:
-            retriever_query = await pipeline.retriever.rewrite_query(sys_prompt=request.rewrite_prompt, user_query=request.query_text)
+            retriever_query = await pipeline.retriever.rewrite_query(sys_prompt=request.rewrite_prompt, user_query=request.query_text, apikey=apikey)
         context_chunks_meta: List[Dict[str, Any]] = pipeline.query(
             query_text=retriever_query,
             top_n_final=request.top_n_final,
             vector_top_k=request.vector_top_k,
-            bm25_top_k=request.bm25_top_k
+            bm25_top_k=request.bm25_top_k,
+            apikey=apikey
         )
         logger.info(f"Retrieved {len(context_chunks_meta)} context chunks for query.")
 
@@ -211,6 +216,7 @@ async def query_repository_stream(request: QueryRequest) -> StreamingResponse:
     # 3. Stream response from LLM
     try:
         response_stream_iterator = llm_generator.generate_response_stream(
+            apikey=apikey,
             sys_prompy=request.sys_prompt,
             user_query=request.query_text,
             context_chunks=context_chunks_meta

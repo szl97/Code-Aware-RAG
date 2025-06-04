@@ -12,7 +12,9 @@ from src.data_processing.chunkers import DocumentChunk  # Pydantic model for chu
 def generate_embeddings(
         texts: List[str],
         model_name: str = config.EMBEDDING_MODEL_NAME,
-        batch_size: int = config.EMBEDDING_BATCH_SIZE
+        batch_size: int = config.EMBEDDING_BATCH_SIZE,
+        dimensions: int = config.EMBEDDING_DIMENSIONS,
+        apikey: Optional[str] = None
 ) -> Optional[np.ndarray]:
     """
     Generates embeddings for a list of texts using the configured provider.
@@ -22,7 +24,7 @@ def generate_embeddings(
 
     logger.info(f"Generating embeddings for {len(texts)} texts using {model_name} (batch size: {batch_size}).")
 
-    client = config.get_openai_embeddings_client()
+    client = config.get_openai_embeddings_client(apikey = apikey)
     all_embeddings = []
     for i in range(0, len(texts), batch_size):
         batch_texts = texts[i:i + batch_size]
@@ -31,7 +33,7 @@ def generate_embeddings(
                 input=batch_texts,
                 model=model_name,
                 encoding_format="float",
-                dimensions=config.EMBEDDING_DIMENSIONS # some models support this
+                dimensions=dimensions # some models support this
             )
             batch_embeddings = [item.embedding for item in response.data]
             all_embeddings.extend(batch_embeddings)
@@ -61,18 +63,23 @@ class FaissVectorIndex:
     """
     Manages the FAISS vector index and associated metadata.
     """
-    def __init__(self, index_dir: Path, embedding_dim: int = config.EMBEDDING_DIMENSIONS):
+    def __init__(self, index_dir: Path,
+                 embedding_dim: int = config.EMBEDDING_DIMENSIONS,
+                 model_name: str = config.EMBEDDING_MODEL_NAME,
+                 batch_size: int = config.EMBEDDING_BATCH_SIZE):
         self.index_dir = index_dir
         self.embedding_dim = embedding_dim
         self.index_file_path = self.index_dir / config.FAISS_INDEX_FILENAME
         self.metadata_file_path = self.index_dir / config.METADATA_FILENAME
+        self.model = model_name
+        self.batch_size = batch_size
 
         self.index: Optional[faiss.Index] = None
         self.chunk_metadata: List[Dict[str, Any]] = [] # Stores metadata for each vector
 
         self.index_dir.mkdir(parents=True, exist_ok=True)
 
-    def build_index(self, chunks: List[DocumentChunk], force_rebuild: bool = False) -> bool:
+    def build_index(self, chunks: List[DocumentChunk], force_rebuild: bool = False, apikey: Optional[str] = None) -> bool:
         """
         Builds or rebuilds the FAISS index from a list of DocumentChunks.
         """
@@ -89,7 +96,7 @@ class FaissVectorIndex:
         logger.info(f"Building FAISS index with {len(chunks)} chunks...")
         chunk_texts = [chunk.content for chunk in chunks]
 
-        embeddings = generate_embeddings(chunk_texts)
+        embeddings = generate_embeddings(chunk_texts, model_name=self.model, batch_size=self.batch_size, dimensions=self.embedding_dim, apikey=apikey)
 
         if embeddings is None or embeddings.shape[0] == 0:
             logger.error("Failed to generate embeddings. Index not built.")
@@ -161,7 +168,13 @@ class FaissVectorIndex:
             self.chunk_metadata = []
             return False
 
-    def search(self, query_text: str, top_k: int = config.RETRIEVAL_VECTOR_TOP_K) -> List[Tuple[float, Dict[str, Any]]]:
+    def search(self,
+               query_text: str,
+               top_k: int = config.RETRIEVAL_VECTOR_TOP_K,
+               model: str = config.EMBEDDING_MODEL_NAME,
+               batch_size: int = config.EMBEDDING_BATCH_SIZE,
+               dimensions: int = config.EMBEDDING_DIMENSIONS,
+               apikey: Optional[str] = None) -> List[Tuple[float, Dict[str, Any]]]:
         """
         Searches the index for a query text.
 
@@ -184,7 +197,7 @@ class FaissVectorIndex:
 
 
         logger.debug(f"Searching index for query: '{query_text[:50]}...' (top_k={top_k})")
-        query_embedding = generate_embeddings([query_text])
+        query_embedding = generate_embeddings(texts =[query_text], apikey=apikey, model_name=model, batch_size=batch_size, dimensions=dimensions)
 
         if query_embedding is None or query_embedding.shape[0] == 0:
             logger.error("Failed to generate embedding for query. Search aborted.")

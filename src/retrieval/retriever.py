@@ -36,7 +36,6 @@ class HybridRetriever:
 
         self.vector_index: Optional[FaissVectorIndex] = None
         self.bm25_index: Optional[BM25Index] = None
-
         self._load_indexes()
 
     def _load_indexes(self) -> bool:
@@ -92,8 +91,8 @@ class HybridRetriever:
             return True
 
 
-    async def rewrite_query(self, sys_prompt: str, user_query: str) -> str:
-        client = config.get_openai_llm_client()
+    async def rewrite_query(self, sys_prompt: str, user_query: str, apikey: Optional[str]) -> str:
+        client = config.get_openai_llm_client(apikey=apikey)
         result = ""
         try:
             stream = await client.chat.completions.create(
@@ -118,6 +117,7 @@ class HybridRetriever:
 
     def retrieve(self,
                  query_text: str,
+                 apikey: Optional[str] = None,
                  top_n_final: Optional[int] = None,
                  vector_top_k: Optional[int] = None,
                  bm25_top_k: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -155,7 +155,7 @@ class HybridRetriever:
             try:
                 # Faiss search returns (distance, metadata)
                 # Lower distance is better.
-                vector_results = self.vector_index.search(query_text, top_k=self.vector_top_k)
+                vector_results = self.vector_index.search(query_text, top_k=self.vector_top_k, apikey=apikey)
                 logger.debug(f"Vector search returned {len(vector_results)} results.")
             except Exception as e:
                 logger.error(f"Error during vector search: {e}")

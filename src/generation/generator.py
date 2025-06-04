@@ -104,6 +104,7 @@ class LLMGenerator:
 
     async def generate_response_stream(
             self,
+            apikey: Optional[str],
             sys_prompy: Optional[str],
             user_query: str,
             context_chunks: List[Dict[str, Any]] # Metadata dicts from retriever
@@ -122,7 +123,7 @@ class LLMGenerator:
 
         logger.info(f"Generating streaming response from {self.model_name}...")
 
-        client = config.get_openai_llm_client()
+        client = config.get_openai_llm_client(apikey=apikey)
         try:
             stream = await client.chat.completions.create(
                 model=self.model_name,
@@ -146,6 +147,7 @@ class LLMGenerator:
 
     async def generate_response_non_streaming(
             self,
+            apikey: Optional[str],
             sys_prompy: Optional[str],
             user_query: str,
             context_chunks: List[Dict[str, Any]]
@@ -158,7 +160,7 @@ class LLMGenerator:
 
         full_response_text = ""
 
-        client = config.get_openai_llm_client()
+        client = config.get_openai_llm_client(apikey=apikey)
         try:
             completion = await client.chat.completions.create(
                 model=self.model_name,
