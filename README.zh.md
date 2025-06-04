@@ -62,28 +62,38 @@
 ## **🚀 快速开始**
 
 1. **克隆项目**:  
+   ```shell
    git clone <your-repository-url>  
    cd <project-directory>
-
+   ```
 2. **创建并激活虚拟环境** (推荐):  
+   ```shell
    python -m venv venv  
    source venv/bin/activate  # Linux/macOS
+   ```
 
 3. **安装依赖**:  
+   ```shell
    pip install -r requirements.txt
+   python download_nltk_data.py
+   ```
 
-   如果某些语言没有预编译的pip包，你可能需要从源码编译其 tree-sitter 语法库，并将生成的共享库文件（如 .so 或 .dll）放置在 grammars/ 目录，并在 config.yaml (或 src/config.py) 中进行相应配置。  
+   * 如果某些语言没有预编译的pip包，你可能需要从源码编译其 tree-sitter 语法库，并将生成的共享库文件（如 .so 或 .dll）放置在 grammars/ 目录，并在 config.yaml (或 src/config.py) 中进行相应配置。  
 
-   请运行 python download_nltk_data.py 下载NLTK数据。
+   * 请运行 python download_nltk_data.py 下载NLTK数据。
 
-4. **配置环境**:  
+4. **配置环境**:
+
+   **编辑 config.yaml 文件（推荐）**
+    * 复制 config.yaml.example 为 config.yaml，并根据需要修改应用配置（如模型名称、路径、分块参数等）。  
+      cp config.yaml.example config.yaml  
+   
    **编辑 .env 文件**
    * 复制 .env.example 为 .env，并填入你的API密钥 (如 OPENAI_API_KEY 等)。  
-     cp .env.example .env  
+     cp .env.example .env
 
-   **编辑 config.yaml 文件**
-   * (可选) 复制 config.yaml.example 为 config.yaml，并根据需要修改应用配置（如模型名称、路径、分块参数等）。  
-     cp config.yaml.example config.yaml  
+   **注意**
+   * 如果不设置apikey，那么服务会以`未配置apikey模式`启动，该模式下用户请求需要在请求头中通过`Bear Token`提供apikey。
      
 
 5. **启动API服务**:  
@@ -92,23 +102,29 @@
    服务默认运行在 http://0.0.0.0:8000 (具体请参考 src/config.py 中的 API_HOST 和 API_PORT 设置)。  
 6. **使用API**:  
    * 设置并索引仓库:  
-     向 POST /repository/setup 端点发送请求。  
-     请求体示例:  
+     * 向 POST /repository/setup 端点发送请求。
+     * 请求头: `Authorization: Bearer {apikey}` （仅在`未配置apikey模式`下需要）
+     * 请求体示例:  
+     ```json
      {  
        "repo_id": "bella-issues-bot",  
        "repo_url_or_path": "https://github.com/bella-top/bella-issues-bot.git",  
        "force_reclone": false,  
        "force_reindex": false  
      }  
+     ```
      `repo_id` 是你为这个仓库指定的唯一标识符。
 
    * 查询已索引的仓库:  
-     向 POST /query/stream 端点发送请求。  
-     请求体示例:  
-     {  
-       "repo_id": "bella-issues-bot",  
+     * 向 POST /query/stream 端点发送请求。  
+     * 请求头: `Authorization: Bearer {apikey}` （仅在`未配置apikey模式`下需要）
+     * 请求体示例:  
+     ```json
+     {
+       "repo_id": "bella-issues-bot",
        "query_text": "Introduce the workflow of bella-issues-bot"
      }
+     ```
 
      响应将是LLM生成的流式文本。
 
@@ -127,6 +143,7 @@
 * **GitPython**: 与Git仓库交互。  
 * **PyYAML**: 解析YAML配置文件。  
 * **python-dotenv**: 加载 .env 文件。
+* * **nltk**: 用于NLP操作，如分词、提取词干和n元组
 
 ## **🔮 未来增强方向 (基于优化策略方案)**
 

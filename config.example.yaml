@@ -1,6 +1,6 @@
 # config.yaml
 api_keys:
-  openai: "sk-your_openai_api_key_from_yaml_if_not_in_env" # Env var takes precedence
+  openai: "sk-your_openai_api_key_from_yaml_if_not_in_env" # Env var takes precedence， If the apikey is not set, the service will start in `no-configured apikey mode`, where user requests need to provide the apikey through `Bear Token` in the request header.
 
 paths:
   data_dir: "/custom/data/path" # Overrides default
