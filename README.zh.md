@@ -13,6 +13,10 @@
 * **混合检索策略 (Hybrid Search)**:  
   * 结合**向量检索** (基于FAISS，捕捉语义相似性) 和 **稀疏检索** (基于BM25，擅长关键词精确匹配)。  
   * 通过**倒数排序融合 (Reciprocal Rank Fusion - RRF)** 算法智能合并两路检索结果，提升检索的召回率和准确率。  
+* **基于LLM的查询改写 (Query Rewriting)**:  
+  * 由于自然语言召回代码文件效率不高，利用大语言模型将用户查询转化为更高效的检索查询。  
+  * 支持提供自定义改写提示词，以开启并且定制查询转换策略。  
+  * 通过更好地将查询与代码的语义结构对齐，提高检索质量。  
 * **多语言支持 (可扩展)**:  
   * tree-sitter 的设计使其易于通过添加新的语言语法库来扩展支持的编程语言。  
 * **模块化与可配置设计**:  
@@ -122,7 +126,9 @@
      ```json
      {
        "repo_id": "bella-issues-bot",
-       "query_text": "Introduce the workflow of bella-issues-bot"
+       "sys_prompt": "xxxx",   // 当不想使用默认的系统提示词时需要提供
+       "query_text": "Introduce the workflow of bella-issues-bot",
+       "rewrite_prompt": "xxx" // 当想要改写查询用于召回时需要提供
      }
      ```
 
