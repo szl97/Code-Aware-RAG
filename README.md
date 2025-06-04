@@ -1,145 +1,145 @@
-# **针对代码仓库的RAG项目 (Code-Aware RAG)**
+# **Code-Aware RAG Project**
 
-本项目旨在构建一个先进的、针对代码仓库的检索增强生成 (RAG) 系统。与传统RAG将代码视为纯文本不同，本项目的核心目标是实现“代码感知”（Code-Aware）能力，更深入地理解代码的结构、语义和依赖关系，从而提供更精准、更智能的问答和分析功能。
+English | [中文](./README.zh.md)
 
-## **✨ 核心特性**
+This project aims to build an advanced Retrieval-Augmented Generation (RAG) system specifically designed for code repositories. Unlike traditional RAG systems that treat code as plain text, the core objective of this project is to achieve "Code-Aware" capabilities, enabling deeper understanding of code structure, semantics, and dependencies to provide more accurate and intelligent Q&A and analysis functionalities.
 
-* **智能代码分块 (Intelligent Code Chunking)**:  
-  * 使用 tree-sitter 解析代码的抽象语法树 (AST)。  
-  * 按代码的逻辑单元（如函数、类、方法）进行分块，而非固定长度，确保了上下文的完整性。  
-  * 保留代码块的层级上下文信息（如所属类、文件名、起止行号）。  
-* **混合检索策略 (Hybrid Search)**:  
-  * 结合**向量检索** (基于FAISS，捕捉语义相似性) 和 **稀疏检索** (基于BM25，擅长关键词精确匹配)。  
-  * 通过**倒数排序融合 (Reciprocal Rank Fusion - RRF)** 算法智能合并两路检索结果，提升检索的召回率和准确率。  
-* **多语言支持 (可扩展)**:  
-  * tree-sitter 的设计使其易于通过添加新的语言语法库来扩展支持的编程语言。  
-* **模块化与可配置设计**:  
-  * 清晰分离数据处理、索引、检索、生成等模块。  
-  * 通过 .env 和 config.yaml 文件进行灵活配置，包括API密钥、模型选择、路径、分块与检索参数等。  
-* **异步API接口**:  
-  * 使用 FastAPI 构建异步API，提供非阻塞的仓库设置和流式查询响应。
+## **✨ Core Features**
 
-## **项目结构**
+* **Intelligent Code Chunking**:
+  * Uses tree-sitter to parse code's Abstract Syntax Tree (AST).
+  * Chunks code by logical units (functions, classes, methods) rather than fixed lengths, ensuring context integrity.
+  * Preserves hierarchical context information (parent class, filename, line numbers).
+* **Hybrid Search Strategy**:
+  * Combines **Vector Search** (using FAISS for semantic similarity) and **Sparse Search** (using BM25 for precise keyword matching).
+  * Intelligently merges results from both approaches using **Reciprocal Rank Fusion (RRF)** algorithm to improve recall and accuracy.
+* **Multi-language Support (Extensible)**:
+  * tree-sitter's design makes it easy to extend language support by adding new grammar libraries.
+* **Modular and Configurable Design**:
+  * Clear separation of data processing, indexing, retrieval, and generation modules.
+  * Flexible configuration through .env and config.yaml files for API keys, model selection, paths, chunking, and retrieval parameters.
+* **Asynchronous API Interface**:
+  * Built with FastAPI for non-blocking repository setup and streaming query responses.
+
+## **Project Structure**
 
 ```
 .
-├── main.py                    # API服务启动入口
-├── requirements.txt           # Python依赖
-├── .env.example               # 环境变量示例文件 (用户需复制为 .env)
-├── config.example.yaml        # 应用配置示例文件 (用户可选复制为 config.yaml)
-├── grammars/                  # (可选) 存放手动编译的tree-sitter语法库 (.so, .dll)
+├── main.py                    # API service entry point
+├── requirements.txt           # Python dependencies
+├── .env.example              # Environment variables example (copy to .env)
+├── config.example.yaml       # Application config example (optionally copy to config.yaml)
+├── grammars/                 # (Optional) Manual compiled tree-sitter grammars (.so, .dll)
 │
-└── src/                       # 源代码目录
-    ├── __init__.py            # 使src成为一个包
-    ├── api.py                 # FastAPI 应用接口定义
-    ├── config.py              # 项目配置加载与管理
-    ├── pipeline.py            # RAG核心处理流程编排 (RAGPipeline)
+└── src/                      # Source code directory
+    ├── __init__.py           # Makes src a package
+    ├── api.py                # FastAPI application interface definitions
+    ├── config.py             # Project configuration loading and management
+    ├── pipeline.py           # RAG core processing flow orchestration (RAGPipeline)
     │
-    ├── data_processing/       # 数据预处理模块
+    ├── data_processing/      # Data preprocessing module
     │   ├── __init__.py
-    │   ├── document_loader.py # 从代码库加载和过滤文件 (LoadedDocument)
-    │   └── chunkers.py        # 智能代码分块 (TreeSitterChunker, TokenSplitter, DocumentChunk)
+    │   ├── document_loader.py # Load and filter files from codebase (LoadedDocument)
+    │   └── chunkers.py       # Intelligent code chunking (TreeSitterChunker, TokenSplitter, DocumentChunk)
     │
-    ├── indexing/              # 索引构建模块
+    ├── indexing/             # Index building module
     │   ├── __init__.py
-    │   ├── vector_index.py    # 向量索引 (FaissVectorIndex, 使用FAISS)
-    │   └── sparse_index.py    # 稀疏索引 (BM25Index, 使用rank_bm25)
+    │   ├── vector_index.py   # Vector indexing (FaissVectorIndex, using FAISS)
+    │   └── sparse_index.py   # Sparse indexing (BM25Index, using rank_bm25)
     │
-    ├── retrieval/             # 检索模块
+    ├── retrieval/            # Retrieval module
     │   ├── __init__.py
-    │   └── retriever.py       # 混合检索器 (HybridRetriever)
+    │   └── retriever.py      # Hybrid retriever (HybridRetriever)
     │
-    ├── generation/            # LLM生成模块
+    ├── generation/           # LLM generation module
     │   ├── __init__.py
-    │   └── generator.py       # LLM交互与Prompt构建 (LLMGenerator)
+    │   └── generator.py      # LLM interaction and Prompt construction (LLMGenerator)
     │
-    └── templates/             # Jinja2 Prompt模板目录
-        └── rag_prompt_template.jinja2 # 默认的RAG Prompt模板
+    └── templates/            # Jinja2 Prompt templates directory
+        └── rag_prompt_template.jinja2 # Default RAG Prompt template
 ```
 
-## **🚀 快速开始**
+## **🚀 Quick Start**
 
-1. **克隆项目**:  
-   git clone <your-repository-url>  
+1. **Clone the Project**:
+   git clone <your-repository-url>
    cd <project-directory>
 
-2. **创建并激活虚拟环境** (推荐):  
-   python -m venv venv  
+2. **Create and Activate Virtual Environment** (recommended):
+   python -m venv venv
    source venv/bin/activate  # Linux/macOS
 
-3. **安装依赖**:  
+3. **Install Dependencies**:
    pip install -r requirements.txt
 
-   如果某些语言没有预编译的pip包，你可能需要从源码编译其 tree-sitter 语法库，并将生成的共享库文件（如 .so 或 .dll）放置在 grammars/ 目录，并在 config.yaml (或 src/config.py) 中进行相应配置。  
+   If some languages don't have pre-compiled pip packages, you might need to compile their tree-sitter grammars from source and place the generated shared library files (.so or .dll) in the grammars/ directory, then configure accordingly in config.yaml (or src/config.py).
 
-   请运行 python download_nltk_data.py 下载NLTK数据。
+   Please run python download_nltk_data.py to download NLTK data.
 
-4. **配置环境**:  
-   **编辑 .env 文件**
-   * 复制 .env.example 为 .env，并填入你的API密钥 (如 OPENAI_API_KEY 等)。  
-     cp .env.example .env  
+4. **Configure Environment**:
+   **Edit .env file**
+   * Copy .env.example to .env and fill in your API keys (e.g., OPENAI_API_KEY).
+     cp .env.example .env
 
-   **编辑 config.yaml 文件**
-   * (可选) 复制 config.yaml.example 为 config.yaml，并根据需要修改应用配置（如模型名称、路径、分块参数等）。  
-     cp config.yaml.example config.yaml  
-     
+   **Edit config.yaml file**
+   * (Optional) Copy config.yaml.example to config.yaml and modify application settings as needed (model names, paths, chunking parameters, etc.).
+     cp config.yaml.example config.yaml
 
-5. **启动API服务**:  
+5. **Start API Service**:
    python main.py
 
-   服务默认运行在 http://0.0.0.0:8000 (具体请参考 src/config.py 中的 API_HOST 和 API_PORT 设置)。  
-6. **使用API**:  
-   * 设置并索引仓库:  
-     向 POST /repository/setup 端点发送请求。  
-     请求体示例:  
-     {  
-       "repo_id": "bella-issues-bot",  
-       "repo_url_or_path": "https://github.com/bella-top/bella-issues-bot.git",  
-       "force_reclone": false,  
-       "force_reindex": false  
-     }  
-     `repo_id` 是你为这个仓库指定的唯一标识符。
+   Service runs by default at http://0.0.0.0:8000 (refer to API_HOST and API_PORT settings in src/config.py).
 
-   * 查询已索引的仓库:  
-     向 POST /query/stream 端点发送请求。  
-     请求体示例:  
-     {  
-       "repo_id": "bella-issues-bot",  
+6. **Use the API**:
+   * Setup and Index Repository:
+     Send request to POST /repository/setup endpoint.
+     Request body example:
+     {
+       "repo_id": "bella-issues-bot",
+       "repo_url_or_path": "https://github.com/bella-top/bella-issues-bot.git",
+       "force_reclone": false,
+       "force_reindex": false
+     }
+     `repo_id` is your unique identifier for this repository.
+
+   * Query Indexed Repository:
+     Send request to POST /query/stream endpoint.
+     Request body example:
+     {
+       "repo_id": "bella-issues-bot",
        "query_text": "Introduce the workflow of bella-issues-bot"
      }
 
-     响应将是LLM生成的流式文本。
+     Response will be streaming text generated by the LLM.
 
-## **🛠️ 技术栈**
+## **🛠️ Tech Stack**
 
-* **Python 3.9+**  
-* **FastAPI**: 高性能Web框架，用于构建API。  
-* **Uvicorn**: ASGI服务器。  
-* **Pydantic**: 数据校验与模型定义。  
-* **Loguru**: 更优雅的日志记录。  
-* **Tree-sitter**: 代码解析与AST（抽象语法树）构建，用于智能分块。  
-* **FAISS**: Facebook AI Similarity Search，用于高效的向量相似性搜索。  
-* **Rank-BM25**: 实现BM25稀疏检索算法。  
-* **Sentence Transformers / OpenAI API / Google Generative AI SDK**: 用于生成文本嵌入和与大语言模型交互。  
-* **Jinja2**: Prompt模板引擎。  
-* **GitPython**: 与Git仓库交互。  
-* **PyYAML**: 解析YAML配置文件。  
-* **python-dotenv**: 加载 .env 文件。
+* **Python 3.9+**
+* **FastAPI**: High-performance web framework for building APIs.
+* **Uvicorn**: ASGI server.
+* **Pydantic**: Data validation and model definition.
+* **Loguru**: More elegant logging.
+* **Tree-sitter**: Code parsing and AST construction for intelligent chunking.
+* **FAISS**: Facebook AI Similarity Search for efficient vector similarity search.
+* **Rank-BM25**: Implementation of BM25 sparse retrieval algorithm.
+* **Sentence Transformers / OpenAI API / Google Generative AI SDK**: For text embeddings and LLM interaction.
+* **Jinja2**: Prompt template engine.
+* **GitPython**: Git repository interaction.
+* **PyYAML**: YAML configuration file parsing.
+* **python-dotenv**: .env file loading.
 
-## **🔮 未来增强方向 (基于优化策略方案)**
+## **🔮 Future Enhancements (Based on Optimization Strategy)**
 
-本项目奠定了坚实的基础，未来可以从以下方向进一步优化和扩展：
+This project lays a solid foundation and can be further optimized and extended in the following directions:
 
-* **阶段一：高级优化**  
-  * **上下文重排 (Context Re-ranking)**: 使用Cross-Encoder模型对初步检索结果进行重排序，提升送入LLM的上下文质量。  
-  * **多向量表示与摘要增强 (Multi-Vector Representation & Summary Augmentation)**: 为代码块创建代码本身、自动生成摘要等多种向量表示，增强检索匹配能力。  
-  * **上下文窗口感知**: 动态处理超出LLM上下文窗口限制的检索内容（截断、摘要等）。  
-* **阶段二：前沿探索**  
-  * **构建代码知识图谱 (Code Knowledge Graph - CKG)**: 抽取代码中的实体（文件、类、函数）和关系（调用、继承、导入），构建图谱以支持更深层次的代码依赖和影响分析。  
-  * **控制流与数据流分析**: 结合更深入的程序分析技术，理解代码执行逻辑。
+* **Phase One: Advanced Optimization**
+  * **Context Re-ranking**: Use Cross-Encoder models to re-rank initial retrieval results, improving context quality for LLM input.
+  * **Multi-Vector Representation & Summary Augmentation**: Create multiple vector representations for code blocks including code itself and auto-generated summaries to enhance retrieval matching.
+  * **Context Window Awareness**: Dynamically handle retrieved content exceeding LLM context window limits (truncation, summarization, etc.).
+* **Phase Two: Frontier Exploration**
+  * **Build Code Knowledge Graph (CKG)**: Extract entities (files, classes, functions) and relationships (calls, inheritance, imports) to support deeper code dependency and impact analysis.
+  * **Control Flow & Data Flow Analysis**: Incorporate deeper program analysis techniques to understand code execution logic.
 
-## **🤝 贡献**
+## **🤝 Contributing**
 
-欢迎对本项目进行贡献！请在提交Pull Request前查阅（待创建的）贡献指南和行为准则。
-
-希望这个README能够清晰地介绍你的项目！
+Contributions are welcome! Please check the (to-be-created) contribution guidelines and code of conduct before submitting Pull Requests.
