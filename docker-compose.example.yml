@@ -1,0 +1,12 @@
+services:
+  code-aware-rag:
+    build: your-code-aware-rag-path/Code-Aware-RAG
+    image: code-aware-rag:latest
+    ports:
+      - "${PORT:-8002}:${PORT:-8002}"
+    environment:
+      - PORT=${PORT:-8002}
+    volumes:
+      - your-data-path:/app/data
+      - your-logs-path:/app/logs
+      - your-config-path/config.yaml:/app/config.yaml

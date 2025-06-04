@@ -35,7 +35,7 @@ nltk>=3.8.1 # For NLP operations like tokenization, stemming, and n-grams
 
 # **Configuration and Utilities**
 
-python-dotenv>=1.0.0
+python-dotenv>=0.21.0
 requests>=2.28.0
 numpy>=1.24.0
 PyYAML>=6.0 # For config files if not using .env exclusively
