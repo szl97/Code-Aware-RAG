@@ -1,5 +1,6 @@
 import asyncio  # For managing pipeline instances
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
+import threading
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +39,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/api-doc/dummy-token-url")
 # Key: repo_id (str), Value: RAGPipeline instance
 pipeline_locks: Dict[str, asyncio.Lock] = {} # To prevent concurrent setup for the same repo_id
 
+# Track repository setup status
+# Key: repo_id (str), Value: Dict with status information
+setup_status: Dict[str, Dict[str, Any]] = {}
+
 # --- Pydantic Models for API Requests and Responses ---
 class RepositorySetupRequest(BaseModel):
     repo_id: str = Field(..., description="A unique identifier for the repository (e.g., 'github_user_repo'). This will be used for directory names.")
@@ -49,8 +54,16 @@ class RepositorySetupRequest(BaseModel):
 class RepositorySetupResponse(BaseModel):
     repo_id: str
     message: str
-    index_status: str # e.g., "Indexed", "Already Existed", "Failed"
+    index_status: str # e.g., "Indexed", "Already Existed", "Failed", "In Progress"
     repository_path: Optional[str] = None # Path where the repo is stored/cloned
+    task_id: Optional[str] = None # ID to track background task
+
+class RepositoryStatusResponse(BaseModel):
+    repo_id: str
+    status: str # "pending", "completed", "failed"
+    message: str
+    index_status: Optional[str] = None
+    repository_path: Optional[str] = None
 
 class QueryRequest(BaseModel):
     repo_id: str = Field(..., description="The unique identifier of the repository to query (must have been set up first).")
@@ -81,40 +94,48 @@ async def shutdown_event():
 async def setup_repository_endpoint(request: RepositorySetupRequest, apikey: Optional[str] = Depends(oauth2_scheme)):
     """
     Sets up a repository: clones it (if a URL is provided) and builds its search indexes.
-    This operation can be time-consuming.
+    This operation is executed in the background.
     """
     repo_id = request.repo_id.replace("/", "_").replace(":", "_") # Sanitize
-
+    
+    # Generate a task ID
+    task_id = f"{repo_id}_{threading.get_ident()}"
+    
     # Get or create a lock for this repo_id
     if repo_id not in pipeline_locks:
         pipeline_locks[repo_id] = asyncio.Lock()
 
-    async with pipeline_locks[repo_id]: # Ensure only one setup process for a repo_id at a time
-        logger.info(f"Received setup request for repo_id: {repo_id}, source: {request.repo_url_or_path}")
+    # Check if setup is already in progress
+    if repo_id in setup_status and setup_status[repo_id].get("status") == "pending":
+        return RepositorySetupResponse(
+            repo_id=repo_id,
+            message="Repository setup already in progress",
+            index_status="In Progress",
+            task_id=setup_status[repo_id].get("task_id")
+        )
 
+    logger.info(f"Received setup request for repo_id: {repo_id}, source: {request.repo_url_or_path}")
+    
+    try:
+        pipeline = RAGPipeline(repo_id=repo_id) # Initializes with correct index_dir
+        logger.info(f"Created new RAGPipeline instance for repo_id: {repo_id}")
+    except Exception as e:
+        logger.error(f"Failed to initialize RAGPipeline for {repo_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Pipeline initialization error: {str(e)}")
+    
+    # Store initial status
+    setup_status[repo_id] = {
+        "status": "pending",
+        "message": "Repository setup started",
+        "index_status": "In Progress",
+        "task_id": task_id,
+        "repository_path": None
+    }
+    
+    # Define the background task function
+    def background_setup():
         try:
-            pipeline = RAGPipeline(repo_id=repo_id) # Initializes with correct index_dir
-            logger.info(f"Created new RAGPipeline instance for repo_id: {repo_id}")
-        except Exception as e:
-            logger.error(f"Failed to initialize RAGPipeline for {repo_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Pipeline initialization error: {str(e)}")
-
-        try:
-            # The setup_repository method is synchronous. For a truly non-blocking API,
-            # this long-running task should be run in a separate thread or process pool.
-            # For FastAPI, `run_in_threadpool` from `starlette.concurrency` is an option.
-            # For this example, we'll call it directly, which might block the event loop
-            # if setup is very long.
-            # from starlette.concurrency import run_in_threadpool
-            # success = await run_in_threadpool(
-            #     pipeline.setup_repository,
-            #     repo_url_or_path=request.repo_url_or_path,
-            #     access_token=request.access_token,
-            #     force_reclone=request.force_reclone,
-            #     force_reindex=request.force_reindex
-            # )
-
-            # Direct call (can block if setup is long)
+            # The actual setup work
             success = pipeline.setup_repository(
                 repo_url_or_path=request.repo_url_or_path,
                 access_token=request.access_token,
@@ -122,39 +143,59 @@ async def setup_repository_endpoint(request: RepositorySetupRequest, apikey: Opt
                 force_reindex=request.force_reindex,
                 apikey=apikey
             )
-
+            
             if success:
                 # Check if indexes actually exist now to determine status
                 index_status = "Indexed Successfully"
                 if not request.force_reindex and \
                         (pipeline.index_dir / config.FAISS_INDEX_FILENAME).exists() and \
                         (pipeline.index_dir / config.BM25_INDEX_FILENAME).exists():
-                    # If not forced and files exist, it implies they were used or just verified
-                    # The RAGPipeline.setup_repository already logs if it skips indexing.
-                    # We can refine this status based on more detailed feedback from setup_repository if needed.
-                    if not request.force_reindex: # If not forced, and they existed, it means they were used.
+                    # If not forced and files exist, they were used or verified
+                    if not request.force_reindex:
                         index_status = "Indexes Already Existed or Verified"
-
-
-                return RepositorySetupResponse(
-                    repo_id=repo_id,
-                    message="Repository setup process completed.",
-                    index_status=index_status,
-                    repository_path=str(pipeline.repository_path) if pipeline.repository_path else None
-                )
+                
+                # Update status to completed
+                setup_status[repo_id] = {
+                    "status": "completed",
+                    "message": "Repository setup process completed",
+                    "index_status": index_status,
+                    "task_id": task_id,
+                    "repository_path": str(pipeline.repository_path) if pipeline.repository_path else None
+                }
             else:
-                # If setup_repository returns False, it means something critical failed.
-                # The RAGPipeline should log specifics.
-                raise HTTPException(status_code=500, detail="Repository setup failed. Check server logs for details.")
-
-        except ValueError as ve: # Catch specific errors like invalid paths
-            logger.error(f"ValueError during repository setup for {repo_id}: {ve}")
-            raise HTTPException(status_code=400, detail=str(ve))
+                # Update status to failed
+                setup_status[repo_id] = {
+                    "status": "failed",
+                    "message": "Repository setup failed",
+                    "index_status": "Failed",
+                    "task_id": task_id,
+                    "repository_path": str(pipeline.repository_path) if pipeline.repository_path else None
+                }
         except Exception as e:
-            logger.error(f"Unexpected error during repository setup for {repo_id}: {e}")
-            # Log the full traceback for debugging
-            logger.exception("Repository setup exception:")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+            logger.error(f"Error in background setup for {repo_id}: {e}")
+            logger.exception("Background setup exception:")
+            # Update status to failed with error message
+            setup_status[repo_id] = {
+                "status": "failed",
+                "message": f"Error: {str(e)}",
+                "index_status": "Failed",
+                "task_id": task_id,
+                "repository_path": str(pipeline.repository_path) if pipeline.repository_path else None
+            }
+    
+    # Start the background task
+    thread = threading.Thread(target=background_setup)
+    thread.daemon = True  # Daemonize thread to not block shutdown
+    thread.start()
+    
+    # Return immediate response
+    return RepositorySetupResponse(
+        repo_id=repo_id,
+        message="Repository setup started in background",
+        index_status="In Progress",
+        repository_path=None,
+        task_id=task_id
+    )
 
 
 @app.post("/v1/code-rag/query/stream")
@@ -229,6 +270,26 @@ async def query_repository_stream(request: QueryRequest, apikey: Optional[str] =
         # The generator itself should handle internal errors and yield error messages if possible.
         raise HTTPException(status_code=500, detail=f"Error generating LLM response: {str(e)}")
 
+
+@app.get("/v1/code-rag/repository/status/{repo_id}")
+async def check_repository_setup_status(repo_id: str):
+    """
+    Check the status of a repository setup process.
+    """
+    sanitized_repo_id = repo_id.replace("/", "_").replace(":", "_")  # Sanitize in the same way
+    
+    if sanitized_repo_id not in setup_status:
+        raise HTTPException(status_code=404, detail=f"No setup process found for repository ID: {repo_id}")
+    
+    status_info = setup_status[sanitized_repo_id]
+    
+    return RepositoryStatusResponse(
+        repo_id=repo_id,
+        status=status_info.get("status", "unknown"),
+        message=status_info.get("message", ""),
+        index_status=status_info.get("index_status"),
+        repository_path=status_info.get("repository_path")
+    )
 
 @app.get("/health")
 async def health_check():

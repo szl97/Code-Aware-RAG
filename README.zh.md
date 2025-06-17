@@ -24,6 +24,8 @@
   * 通过 .env 和 config.yaml 文件进行灵活配置，包括API密钥、模型选择、路径、分块与检索参数等。  
 * **异步API接口**:  
   * 使用 FastAPI 构建异步API，提供非阻塞的仓库设置和流式查询响应。
+  * 仓库设置操作在后台处理，避免API阻塞。
+  * 提供状态跟踪API，用于监控仓库设置进度。
 
 ## **项目结构**
 
@@ -106,7 +108,7 @@
    服务默认运行在 http://0.0.0.0:8000 (具体请参考 src/config.py 中的 API_HOST 和 API_PORT 设置)。  
 6. **使用API**:  
    * 设置并索引仓库:  
-     * 向 POST /repository/setup 端点发送请求。
+     * 向 POST /v1/code-rag/repository/setup 端点发送请求。
      * 请求头: `Authorization: Bearer {apikey}` （仅在`未配置apikey模式`下需要）
      * 请求体示例:  
      ```json
@@ -117,10 +119,25 @@
        "force_reindex": false  
      }  
      ```
-     `repo_id` 是你为这个仓库指定的唯一标识符。
+     * 此操作在后台运行并立即返回任务ID。
+     * `repo_id` 是你为这个仓库指定的唯一标识符。
+
+   * 查询仓库设置状态:
+     * 向 GET /v1/code-rag/repository/status/{repo_id} 端点发送请求。
+     * 请求头: `Authorization: Bearer {apikey}` （仅在`未配置apikey模式`下需要）
+     * 响应示例:  
+     ```json
+     {
+       "repo_id": "bella-issues-bot",
+       "status": "completed",  // "pending"(进行中), "completed"(完成), 或 "failed"(失败)
+       "message": "Repository setup process completed", 
+       "index_status": "Indexed Successfully",
+       "repository_path": "/path/to/repository"
+     }
+     ```
 
    * 查询已索引的仓库:  
-     * 向 POST /query/stream 端点发送请求。  
+     * 向 POST /v1/code-rag/query/stream 端点发送请求。  
      * 请求头: `Authorization: Bearer {apikey}` （仅在`未配置apikey模式`下需要）
      * 请求体示例:  
      ```json

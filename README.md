@@ -24,6 +24,8 @@ This project aims to build an advanced Retrieval-Augmented Generation (RAG) syst
   * Improves retrieval quality by better aligning queries with the code's semantic structure.
 * **Asynchronous API Interface**:
   * Built with FastAPI for non-blocking repository setup and streaming query responses.
+  * Background processing for repository setup operations to avoid API blocking.
+  * Status tracking API for monitoring repository setup progress.
 
 ## **Project Structure**
 
@@ -109,7 +111,7 @@ This project aims to build an advanced Retrieval-Augmented Generation (RAG) syst
 
 6. **Use the API**:
    * Setup and Index Repository:
-     * Send request to POST /repository/setup endpoint.
+     * Send request to POST /v1/code-rag/repository/setup endpoint.
      * Header: `Authorization: Bearer {apikey}` (only need in `no-configured apikey mode`)
      * Request body example:
      ```json
@@ -120,10 +122,25 @@ This project aims to build an advanced Retrieval-Augmented Generation (RAG) syst
        "force_reindex": false
      }
      ```
-     `repo_id` is your unique identifier for this repository.
+     * This operation runs in the background and returns immediately with a task ID.
+     * `repo_id` is your unique identifier for this repository.
+
+   * Check Repository Setup Status:
+     * Send request to GET /v1/code-rag/repository/status/{repo_id} endpoint.
+     * Header: `Authorization: Bearer {apikey}` (only need in `no-configured apikey mode`)
+     * Response example:
+     ```json
+     {
+       "repo_id": "bella-issues-bot",
+       "status": "completed",  // "pending", "completed", or "failed"
+       "message": "Repository setup process completed", 
+       "index_status": "Indexed Successfully",
+       "repository_path": "/path/to/repository"
+     }
+     ```
 
    * Query Indexed Repository:
-     * Send request to POST /query/stream endpoint.
+     * Send request to POST /v1/code-rag/query/stream endpoint.
      * Header: `Authorization: Bearer {apikey}` (only need in `no-configured apikey mode`)
      * Request body example:
      ```json
